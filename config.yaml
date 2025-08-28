@@ -38,9 +38,9 @@ processes:
       GIN_MODE: "release"
     # ===> 自定义日志文件路径
     # log_file: "/var/log/my_api_server.log"
-    # ===> 声明依赖关系
-    depends_on:
-     - "web-server-1"
+    # ===> 声明依赖关系(TODO)
+    # depends_on:
+    #  - "web-server-1"
 
   # 示例3: 一个被禁用的进程
   # enabled: false 意味着 procmate 在执行任何操作时都会忽略这个进程。

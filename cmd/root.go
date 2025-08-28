@@ -4,58 +4,77 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"github.com/spf13/cobra" // 引入 cobra
+	"procmate/pkg/config"    // 引入我们自己写的 config 包
 )
 
-var (
-	cfgFile string
-)
+// cfgFile 是一个包级私有变量，用于存储 --config 标志传入的配置文件路径。
+var cfgFile string
 
-// rootCmd 代表了我们应用的基础命令，没有任何子命令时被调用
+// rootCmd 代表了我们应用的根命令。
+// 当不带任何子命令直接调用应用时，执行的就是它。
 var rootCmd = &cobra.Command{
-	Use:   "hk-console",
-	Short: "一个统一管理和监控组件、服务的工具",
-	Long: `hk-console 是一个现代化的命令行工具，旨在简化服务的启停、
-状态监控和日志查看。它通过一个简单的配置文件来管理所有实体。`,
+	// Use 是命令的名称，也就是我们在终端里输入的内容
+	Use: "procmate",
+	// Short 是命令的简短描述，会出现在 'help' 列表里
+	Short: "一个用于管理和监控进程的命令行工具",
+	// Long 是命令的详细描述，当运行 'procmate help' 时会显示
+	Long: `procmate 是一个用 Go编写的进程伴侣工具。
+      它可以帮助您轻松地启动、停止、监控和管理在配置
+      文件中定义的各种进程。`,
+	// Run 字段是一个函数，如果这个命令有自己的执行逻辑（而不是必须跟一个子命令），
+	// 那么这个函数就会被执行。对于根命令，我们通常让它打印帮助信息。
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("欢迎使用 hk-console！")
-		fmt.Println("请使用 'hk-console --help' 查看所有可用命令。")
+		// 如果用户只输入了 'procmate' 而没有跟任何子命令，就打印帮助信息。
+		cmd.Help()
 	},
 }
 
-// Execute 将所有子命令添加到根命令中，并设置相应的标志。
-// 这是 main.main() 调用的主要函数。
+// Execute 函数是 rootCmd 的公共入口点。
+// main.go 将会调用这个函数来启动整个命令处理流程。
 func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
+	// cobra 会解析命令行参数，找到对应的命令并执行。
+	// 如果出错（比如，用户输入了不存在的标志），则会 panic 并打印错误。
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 }
 
+// init 函数在 main 函数之前自动执行。
+// 我们在这里进行所有的初始化工作，比如定义标志和加载配置。
 func init() {
+	// cobra.OnInitialize() 注册一个或多个函数，这些函数会在解析标志之后
+	// 执行命令的 Run 函数之前被 cobra 调用。我们在这里加载配置是最佳时机。
 	cobra.OnInitialize(initConfig)
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "配置文件路径 (默认是 ./config.yaml)")
+
+	// 这里我们为根命令定义了一个“持久化的标志”(Persistent Flag)。
+	// 持久化意味着，这个标志不仅根命令可以用，所有子命令也都可以用。
+	// &cfgFile: 将标志的值绑定到 cfgFile 变量上。
+	// "config": 标志的全名 (--config)。
+	// "f": 标志的短名 (-f)。
+	// "": 默认值。
+	// "配置文件路径 (默认为 ./config.yaml)": 帮助信息。
+	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "f", "", "./config.yaml)")
 }
 
-// initConfig 在 Cobra 初始化时被调用，用于读取配置文件
+// initConfig 函数是我们注册给 cobra.OnInitialize 的函数。
+// 它负责调用我们之前写好的 config.LoadConfig 来加载配置。
 func initConfig() {
-	if cfgFile != "" {
-		// 使用命令行标志指定的配置文件
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// 否则，在当前目录查找名为 config.yaml 的文件
-		vip.AddConfigPath(".")
-		vip.SetConfigName("config")
-		vip.SetConfigType("yaml")
+	// 如果用户通过 --config 标志提供了配置文件路径，就使用该路径。
+	// 否则，我们就默认使用当前目录下的 "config.yaml"。
+	configFile := cfgFile
+	if configFile == "" {
+		configFile = "config.yaml"
 	}
 
-	vip.AutomaticEnv() // 读取匹配的环境变量
-
-	// 如果能找到并读取配置文件，则使用它
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("成功加载配置文件:", viper.ConfigFileUsed())
-	} else {
-		fmt.Println("警告: 无法加载配置文件。", err)
+	// 调用 pkg/config 包中的 LoadConfig 函数。
+	if err := config.LoadConfig(configFile); err != nil {
+		// 如果加载配置失败，就打印错误信息并退出程序。
+		fmt.Printf("加载配置文件 %s 失败: %v\n", configFile, err)
+		os.Exit(1)
 	}
+
+	// (可选) 打印一条信息，确认配置已加载
+	fmt.Printf("成功加载配置文件: %s\n", configFile)
 }

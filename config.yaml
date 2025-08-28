@@ -1,0 +1,53 @@
+
+# procmate 进程伴侣配置文件
+# 该文件用于定义和管理所有需要被监控和管理的组件与服务。
+
+# 基础配置
+settings:
+  # 运行时文件的根目录 (用于存放 pid 和 logs)
+  runtime_dir: /tmp/procmate
+  # 默认的启动超时时间 (秒)
+  default_start_timeout_sec: 10
+  # 默认的停止超时时间 (秒)
+  default_stop_timeout_sec: 10
+  # 'watch' 命令的轮询周期 (秒)
+  watch_interval_sec: 10
+
+# 组件列表 (按启动顺序排列)
+processes:
+  # 示例1: 一个模拟的Web服务器
+  - name: web-server-1
+    group: web
+    command: "while true; do { echo -e 'HTTP/1.1 200 OK\\r\\n\\r\\nHello from web-server-1'; } | nc -l -p 8080; done"
+    workdir: "/tmp"
+    port: 8080
+    enabled: true
+    # 这个进程使用自定义的启动超时
+    start_timeout_sec: 5
+
+  # 示例2: 另一个模拟的API服务
+  - name: api-server-2
+    group: api
+    command: "while true; do { echo -e 'HTTP/1.1 200 OK\\r\\n\\r\\nHello from api-server-2'; } | nc -l -p 8081; done"
+    workdir: "/tmp"
+    port: 8081
+    enabled: true
+    # ===> 为这个进程注入环境变量
+    environment:
+      API_KEY: "your-secret-key"
+      GIN_MODE: "release"
+    # ===> 自定义日志文件路径
+    log_file: "/var/log/my_api_server.log"
+    # ===> 声明依赖关系
+    depends_on:
+     - "web-server-1"
+
+  # 示例3: 一个被禁用的进程
+  # enabled: false 意味着 procmate 在执行任何操作时都会忽略这个进程。
+  # 这对于我们测试程序的筛选逻辑很有帮助。
+  - name: disabled-process
+    group: examples
+    command: "sleep 3600"
+    workdir: "/tmp"
+    port: 9999
+    enabled: false

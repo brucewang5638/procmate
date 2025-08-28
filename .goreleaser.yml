@@ -1,0 +1,60 @@
+# .goreleaser.yml
+# 这是 GoReleaser 的配置文件
+
+before:
+  hooks:
+    # 在构建之前，运行 go mod tidy 确保所有依赖都已同步
+    - go mod tidy
+
+builds:
+  # 定义构建规则
+  - 
+    # Go 程序的主入口文件
+    main: ./main.go
+    
+    # 生成的二进制可执行文件的名字
+    binary: procmate
+    
+    # 在构建时使用的环境变量，我们在这里使用 CGO_ENABLED=0 来确保静态链接
+    env:
+      - CGO_ENABLED=0
+      
+    # 目标平台列表
+    goos:
+      - linux   # Linux 系统
+      - windows # Windows 系统
+      - darwin  # macOS 系统
+    goarch:
+      - amd64   # 64位 x86 架构
+      - arm64   # 64位 ARM 架构 (如 Apple M1/M2, 树莓派等)
+
+# 归档打包配置
+archives:
+  - 
+    # 定义打包后的 .tar.gz 或 .zip 文件的命名格式
+    name_template: '{{.ProjectName}}_{{.Version}}_{{.Os}}_{{.Arch}}'
+    
+    # 默认打包成 .tar.gz
+    format: tar.gz
+    
+    # 对 Windows 系统，覆盖打包格式为 .zip
+    format_overrides:
+      - goos: windows
+        format: zip
+
+# 生成校验和文件
+checksum:
+  name_template: 'checksums.txt'
+
+# 快照版本命名（用于非 tag 的构建）
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+# 自动生成版本更新日志
+changelog:
+  sort: asc
+  filters:
+    # 从日志中排除特定前缀的 commit
+    exclude:
+      - '^docs:'
+      - '^test:'

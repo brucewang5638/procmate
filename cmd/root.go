@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	"procmate/pkg/config" // 引入我们自己写的 config 包
+
 	"github.com/spf13/cobra" // 引入 cobra
-	"procmate/pkg/config"    // 引入我们自己写的 config 包
 )
 
 // cfgFile 是一个包级私有变量，用于存储 --config 标志传入的配置文件路径。
@@ -76,5 +77,5 @@ func initConfig() {
 	}
 
 	// (可选) 打印一条信息，确认配置已加载
-	fmt.Printf("成功加载配置文件: %s\n", configFile)
+	// fmt.Printf("成功加载配置文件: %s\n", configFile)
 }

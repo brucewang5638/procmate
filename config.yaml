@@ -26,7 +26,7 @@ processes:
     start_timeout_sec: 5
 
   # 示例2: 另一个模拟的API服务
-  - name: api-server-2
+  - name: api-server-1
     group: api
     command: "while true; do { echo -e 'HTTP/1.1 200 OK\\r\\n\\r\\nHello from api-server-2'; } | nc -l -p 8081; done"
     workdir: "/tmp"
@@ -37,7 +37,7 @@ processes:
       API_KEY: "your-secret-key"
       GIN_MODE: "release"
     # ===> 自定义日志文件路径
-    log_file: "/var/log/my_api_server.log"
+    # log_file: "/var/log/my_api_server.log"
     # ===> 声明依赖关系
     depends_on:
      - "web-server-1"

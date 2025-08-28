@@ -4,10 +4,17 @@ import (
 	"github.com/spf13/viper" // 引入 viper 库
 )
 
-// Process 定义了一个需要被管理的进程的结构。
+// Settings 结构体对应配置文件中的 'settings' 部分。
 // 字段上的 `mapstructure:"..."` 标签（tag）是给 Viper 使用的，
-// 它告诉 Viper 在解析 YAML 文件时，应该把哪个键的值赋给这个字段。
-// 例如，YAML 中的 `name:` 键会对应到 `Name` 字段。
+
+type Settings struct {
+	RuntimeDir             string `mapstructure:"runtime_dir"`
+	DefaultStartTimeoutSec int    `mapstructure:"default_start_timeout_sec"`
+	DefaultStopTimeoutSec  int    `mapstructure:"default_stop_timeout_sec"`
+	WatchIntervalSec       int    `mapstructure:"watch_interval_sec"`
+}
+
+// Process 结构体对应 'processes' 列表中的每一个进程项。
 type Process struct {
 	Name    string `mapstructure:"name"`
 	Group   string `mapstructure:"group"`
@@ -15,21 +22,34 @@ type Process struct {
 	WorkDir string `mapstructure:"workdir"`
 	Port    int    `mapstructure:"port"`
 	Enabled bool   `mapstructure:"enabled"`
+
+	// 使用 int 表示超时（秒）
+	// 如果 YAML 中未配置，将使用全局默认值。
+	StartTimeoutSec int `mapstructure:"start_timeout_sec"`
+	StopTimeoutSec  int `mapstructure:"stop_timeout_sec"`
+
+	// 自定义日志文件路径
+	LogFile string `mapstructure:"log_file"`
+
+	// 环境变量 (map 的键是环境变量名，值是其对应的值)
+	Environment map[string]string `mapstructure:"environment"`
+
+	// 依赖关系 (字符串切片)
+	DependsOn []string `mapstructure:"depends_on"`
 }
 
 // Config 是整个配置文件的顶层结构。
-// 它包含一个 Process 类型的切片（slice），切片是 Go 中表示动态数组的方式。
 type Config struct {
+	Settings  Settings  `mapstructure:"settings"`
 	Processes []Process `mapstructure:"processes"`
 }
 
-// 全局变量，用于在内存中缓存解析后的配置。
-// 使用指针 *Config 是为了在多个地方共享同一份配置数据，避免不必要的拷贝。
+// Cfg 是一个指向 Config 实例的全局指针，用于在程序各处访问配置。
 var Cfg *Config
 
-// LoadConfig 函数负责读取和解析配置文件。
+// LoadConfig 使用 Viper 读取和解析配置文件。
+// 注意：Viper 的 Unmarshal 会自动处理新字段。
 func LoadConfig(path string) error {
-	// 1. 初始化 Viper
 	v := viper.New()
 
 	// 2. 设置配置文件路径和名称
@@ -38,7 +58,6 @@ func LoadConfig(path string) error {
 
 	// 3. 读取配置文件
 	if err := v.ReadInConfig(); err != nil {
-		// 如果读取文件出错，将错误返回
 		return err
 	}
 
@@ -47,9 +66,8 @@ func LoadConfig(path string) error {
 	//    我们传入 &Cfg，因为 Cfg本身是一个指针，我们需要传递它的地址，
 	//    以便 Unmarshal 能够修改 Cfg使其指向一个新的、填充好数据的 Config 实例。
 	if err := v.Unmarshal(&Cfg); err != nil {
-		// 如果解析配置出错，将错误返回
 		return err
 	}
 
-	return nil // 一切顺利，返回 nil (表示没有错误)
+	return nil
 }

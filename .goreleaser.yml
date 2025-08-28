@@ -8,17 +8,17 @@ before:
 
 builds:
   # 定义构建规则
-  - 
+  -
     # Go 程序的主入口文件
     main: ./main.go
-    
+
     # 生成的二进制可执行文件的名字
     binary: procmate
-    
+
     # 在构建时使用的环境变量，我们在这里使用 CGO_ENABLED=0 来确保静态链接
     env:
       - CGO_ENABLED=0
-      
+
     # 目标平台列表
     goos:
       - linux   # Linux 系统
@@ -30,17 +30,21 @@ builds:
 
 # 归档打包配置
 archives:
-  - 
+  -
     # 定义打包后的 .tar.gz 或 .zip 文件的命名格式
     name_template: '{{.ProjectName}}_{{.Version}}_{{.Os}}_{{.Arch}}'
-    
+
     # 默认打包成 .tar.gz
     format: tar.gz
-    
+
     # 对 Windows 系统，覆盖打包格式为 .zip
     format_overrides:
       - goos: windows
         format: zip
+
+    # 将额外的文件包含进最终的压缩包中
+    files:
+      - config.yaml
 
 # 生成校验和文件
 checksum:

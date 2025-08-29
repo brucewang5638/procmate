@@ -4,17 +4,18 @@
 
 ## ✨ 功能特性
 
-* **统一管理**: 通过一个 `config.yaml` 文件，集中管理所有需要运行的进程。
-* **生命周期控制**: 支持 `start`, `stop`, `status`, `restart` 等完整的生命周期命令。
-* **后台守护**: `watch` 命令可以作为守护进程，持续监控并自动重启意外崩溃的进程。
-* **高度可配置**:
+- **统一管理**: 通过一个 `config.yaml` 文件，集中管理所有需要运行的进程。
+- **生命周期控制**: 支持 `start`, `stop`, `status`, `restart` 等完整的生命周期命令。
+- **后台守护**: `watch` 命令可以作为守护进程，持续监控并自动重启意外崩溃的进程。
+- **高度可配置**:
 
-  * 支持自定义启动/停止超时。
-  * 支持为进程注入环境变量。
-  * 支持自定义日志文件路径。
-* **日志记录**: 自动将每个进程的输出重定向到指定的日志文件。
-* **Systemd 集成**: 可以轻松地被集成为一个标准的 Linux 系统服务，实现开机自启。
-* **高可移植性**: 可被静态编译为单一的二进制文件，在不同版本的 Linux 系统中运行，无 `glibc` 依赖问题。
+  - 支持自定义启动/停止超时。
+  - 支持为进程注入环境变量。
+  - 支持自定义日志文件路径。
+
+- **日志记录**: 自动将每个进程的输出重定向到指定的日志文件。
+- **Systemd 集成**: 可以轻松地被集成为一个标准的 Linux 系统服务，实现开机自启。
+- **高可移植性**: 可被静态编译为单一的二进制文件，在不同版本的 Linux 系统中运行，无 `glibc` 依赖问题。
 
 ## 🚀 安装
 
@@ -31,7 +32,18 @@
    将编译好的 `procmate` 文件移动到系统的可执行路径下，以便在任何地方都能调用它。
 
    ```bash
-   sudo mv procmate /usr/local/bin/
+    # 1. 创建目录（如果不存在）
+    sudo mkdir -p /opt/procmate
+
+    # 2. 移动 procmate 文件到目录中
+    sudo mv procmate /opt/procmate/
+
+    # 3. 给文件赋予可执行权限（777 表示所有人可读写执行，但 一般建议 755 就够安全）
+    sudo chmod 777 /opt/procmate/procmate
+
+    # 4. 在 /usr/local/bin 创建软链接
+    sudo ln -sf /opt/procmate/procmate /usr/local/bin/procmate
+
    ```
 
 ## ⚙️ 配置
@@ -43,10 +55,10 @@
 ```yaml
 # 全局默认设置
 settings:
-  runtime_dir: /tmp/procmate           # 运行时文件 (pid, logs) 的根目录
-  default_start_timeout_sec: 10        # 默认启动超时 (秒)
-  default_stop_timeout_sec: 10         # 默认停止超时 (秒)
-  watch_interval_sec: 10               # 'watch' 命令的轮询周期 (秒)
+  runtime_dir: /tmp/procmate # 运行时文件 (pid, logs) 的根目录
+  default_start_timeout_sec: 10 # 默认启动超时 (秒)
+  default_stop_timeout_sec: 10 # 默认停止超时 (秒)
+  watch_interval_sec: 10 # 'watch' 命令的轮询周期 (秒)
 
 processes:
   - name: web-server-1
@@ -72,13 +84,13 @@ processes:
 
 确保您的 `config.yaml` 文件存在。您可以通过 `--config` 或 `-f` 标志来指定其路径。
 
-* **检查所有进程的状态**
+- **检查所有进程的状态**
 
   ```bash
   procmate status
   ```
 
-* **启动所有已启用的进程**
+- **启动所有已启用的进程**
 
   ```bash
   procmate start
@@ -86,31 +98,31 @@ processes:
   procmate start all
   ```
 
-* **启动单个进程**
+- **启动单个进程**
 
   ```bash
   procmate start [name]
   ```
 
-* **停止所有进程**
+- **停止所有进程**
 
   ```bash
   procmate stop
   ```
 
-* **停止单个进程**
+- **停止单个进程**
 
   ```bash
   procmate stop [name]
   ```
 
-* **启动守护模式** (通常在前台运行用于调试，或通过 systemd 在后台运行)
+- **启动守护模式** (通常在前台运行用于调试，或通过 systemd 在后台运行)
 
   ```bash
   procmate watch
   ```
 
-* **指定配置文件路径**
+- **指定配置文件路径**
 
   ```bash
   procmate --config /etc/procmate/config.yaml status
@@ -162,4 +174,3 @@ processes:
    # 查看实时日志
    sudo journalctl -u procmate.service -f
    ```
-

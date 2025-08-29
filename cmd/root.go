@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"procmate/pkg/config" // 引入我们自己写的 config 包
 
@@ -61,20 +62,48 @@ func init() {
 // initConfig 函数是我们注册给 cobra.OnInitialize 的函数。
 // 它负责调用我们之前写好的 config.LoadConfig 来加载配置。
 func initConfig() {
-	// 如果用户通过 --config 标志提供了配置文件路径，就使用该路径。
-	// 否则，我们就默认使用当前目录下的 "config.yaml"。
-	configFile := cfgFile
-	if configFile == "" {
-		configFile = "config.yaml"
+	// 1. 如果用户通过 --config 标志提供了路径，则优先使用它。
+	if cfgFile != "" {
+		if err := config.LoadConfig(cfgFile); err != nil {
+			fmt.Printf("加载指定的配置文件 %s 失败: %v\n", cfgFile, err)
+			os.Exit(1)
+		}
+		// fmt.Printf("成功加载指定的配置文件: %s\n", cfgFile)
+		return
 	}
 
-	// 调用 pkg/config 包中的 LoadConfig 函数。
-	if err := config.LoadConfig(configFile); err != nil {
-		// 如果加载配置失败，就打印错误信息并退出程序。
-		fmt.Printf("加载配置文件 %s 失败: %v\n", configFile, err)
-		os.Exit(1)
+	// 2. 如果未指定路径，则按顺序搜索默认位置。
+	//    - 当前工作目录
+	//    - /etc/procmate/
+	searchPaths := []string{
+		"config.yaml",               // 当前工作目录
+		"/etc/procmate/config.yaml", // 系统级配置目录
 	}
 
-	// (可选) 打印一条信息，确认配置已加载
-	// fmt.Printf("成功加载配置文件: %s\n", configFile)
+	// (可选) 添加用户家目录的搜索路径
+	if home, err := os.UserHomeDir(); err == nil {
+		searchPaths = append(searchPaths, filepath.Join(home, ".config", "procmate", "config.yaml"))
+	}
+
+	// 3. 遍历搜索路径，找到第一个存在的配置文件并加载。
+	for _, path := range searchPaths {
+		// 使用 os.Stat 检查文件是否存在。
+		if _, err := os.Stat(path); err == nil {
+			if loadErr := config.LoadConfig(path); loadErr != nil {
+				fmt.Printf("加载配置文件 %s 失败: %v\n", path, loadErr)
+				os.Exit(1)
+			}
+			// (可选) 打印成功加载信息
+			// fmt.Printf("成功加载配置文件: %s\n", path)
+			return // 找到并成功加载后，立即返回
+		}
+	}
+
+	// 4. 如果遍历完所有路径都找不到配置文件，则报错退出。
+	fmt.Println("错误: 找不到配置文件。")
+	fmt.Println("请在以下任一位置创建 config.yaml 文件，或使用 --config 标志指定路径:")
+	for _, path := range searchPaths {
+		fmt.Printf("  - %s\n", path)
+	}
+	os.Exit(1)
 }

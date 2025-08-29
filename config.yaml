@@ -1,4 +1,3 @@
-
 # procmate 进程伴侣配置文件
 # 该文件用于定义和管理所有需要被监控和管理的组件与服务。
 
@@ -12,7 +11,12 @@ settings:
   default_stop_timeout_sec: 10
   # 'watch' 命令的轮询周期 (秒)
   watch_interval_sec: 10
-
+  # 日志配置
+  log_options:
+    max_size_mb: 1
+    max_backups: 3
+    max_age_days: 30
+    compress: true
 # 组件列表 (按启动顺序排列)
 processes:
   # 示例: 一个模拟的Web服务器

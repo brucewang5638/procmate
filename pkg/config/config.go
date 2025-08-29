@@ -5,13 +5,12 @@ import (
 )
 
 // Settings 结构体对应配置文件中的 'settings' 部分。
-// 字段上的 `mapstructure:"..."` 标签（tag）是给 Viper 使用的，
-
 type Settings struct {
-	RuntimeDir             string `mapstructure:"runtime_dir"`
-	DefaultStartTimeoutSec int    `mapstructure:"default_start_timeout_sec"`
-	DefaultStopTimeoutSec  int    `mapstructure:"default_stop_timeout_sec"`
-	WatchIntervalSec       int    `mapstructure:"watch_interval_sec"`
+	RuntimeDir             string     `mapstructure:"runtime_dir"`
+	DefaultStartTimeoutSec int        `mapstructure:"default_start_timeout_sec"`
+	DefaultStopTimeoutSec  int        `mapstructure:"default_stop_timeout_sec"`
+	WatchIntervalSec       int        `mapstructure:"watch_interval_sec"`
+	LogOptions             LogOptions `mapstructure:"log_options"`
 }
 
 // LogOptions 结构体对应 'log_options' 部分，用于配置日志轮转。
@@ -41,12 +40,6 @@ type Process struct {
 
 	// 依赖关系 (字符串切片)
 	DependsOn []string `mapstructure:"depends_on"`
-
-	// 日志文件路径
-	LogFile string `mapstructure:"log_file"`
-
-	// 日志轮转配置
-	LogOptions LogOptions `mapstructure:"log_options"`
 }
 
 // Config 是整个配置文件的顶层结构。

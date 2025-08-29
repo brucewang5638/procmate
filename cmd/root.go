@@ -80,7 +80,7 @@ func initConfig() {
 		"/etc/procmate/config.yaml", // 系统级配置目录
 	}
 
-	// (可选) 添加用户家目录的搜索路径
+	// 添加用户家目录的搜索路径
 	if home, err := os.UserHomeDir(); err == nil {
 		searchPaths = append(searchPaths, filepath.Join(home, ".config", "procmate", "config.yaml"))
 	}

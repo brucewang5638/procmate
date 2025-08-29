@@ -45,6 +45,7 @@ archives:
     # 将额外的文件包含进最终的压缩包中
     files:
       - config.yaml
+      - install.sh
 
 # 生成校验和文件
 checksum:

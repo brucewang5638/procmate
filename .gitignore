@@ -15,3 +15,5 @@ procmate
 # 忽略本地可能产生的日志或pid文件（虽然我们配置在了/tmp下）
 *.log
 *.pid
+
+back-sh/

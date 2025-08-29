@@ -15,29 +15,26 @@ import (
 func Start(proc config.Process) error {
 	// fmt.Printf("🚀 正在尝试启动进程: %s...\n", proc.Name)
 
-	// 如果端口已被占用，说明进程可能已在运行
-	if CheckPort(proc.Port) {
-		fmt.Printf("✅ 进程 '%s' 已在运行 (端口 %d 已被监听)。\n", proc.Name, proc.Port)
+	// 检查是否启动了进程，运行
+	if IsRunning(proc) {
+		fmt.Printf("✅ 进程 '%s' 已在运行。\n", proc.Name)
+		fmt.Printf("✅ 进程 '%s' 占用了端口：\n", 0)
 		return nil
-	}
-
-	// === 获取路径 ===
-	logFilePath, err := GetLogFile(proc)
-	if err != nil {
-		return fmt.Errorf("获取日志文件路径失败: %w", err)
 	}
 
 	// === 构造命令 ===
 	cmd := exec.Command("bash", "-c", proc.Command)
 	cmd.Dir = proc.WorkDir
 
-	// 重定向标准输出和标准错误到日志文件
-	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	// 重定向标准输出和标准错误到管道
+	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
-		return fmt.Errorf("打开日志文件 %s 失败: %w", logFilePath, err)
+		return fmt.Errorf("获取 stdout pipe 失败: %w", err)
 	}
-	cmd.Stdout = logFile
-	cmd.Stderr = logFile
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("获取 stderr pipe 失败: %w", err)
+	}
 
 	// 应用环境变量（继承系统环境 + 进程配置）
 	if len(proc.Environment) > 0 {
@@ -49,14 +46,16 @@ func Start(proc config.Process) error {
 
 	// === 启动进程 ===
 	if err := cmd.Start(); err != nil {
-		logFile.Close() // 启动失败时也要确保关闭文件句柄
 		return fmt.Errorf("启动命令失败: %w", err)
 	}
+
+	// === 后台记录日志 ===
+	go handleLogStream(proc, "stdout", stdoutPipe)
+	go handleLogStream(proc, "stderr", stderrPipe)
 
 	pid := cmd.Process.Pid
 	if err := WritePid(proc, pid); err != nil {
 		// 因为如果 WritePid 失败了，需要执行清理操作。
-		logFile.Close()
 		cmd.Process.Kill()
 		return fmt.Errorf("写入 PID 文件失败: %w", err)
 	}
@@ -80,8 +79,6 @@ func Start(proc config.Process) error {
 		}
 		time.Sleep(1 * time.Second)
 	}
-
-	logFile.Close()
 
 	if success {
 		// 保持沉默由cmd发声

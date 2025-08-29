@@ -14,6 +14,14 @@ type Settings struct {
 	WatchIntervalSec       int    `mapstructure:"watch_interval_sec"`
 }
 
+// LogOptions 结构体对应 'log_options' 部分，用于配置日志轮转。
+type LogOptions struct {
+	MaxSizeMB  int  `mapstructure:"max_size_mb"`
+	MaxBackups int  `mapstructure:"max_backups"`
+	MaxAgeDays int  `mapstructure:"max_age_days"`
+	Compress   bool `mapstructure:"compress"`
+}
+
 // Process 结构体对应 'processes' 列表中的每一个进程项。
 type Process struct {
 	Name    string `mapstructure:"name"`
@@ -28,14 +36,17 @@ type Process struct {
 	StartTimeoutSec int `mapstructure:"start_timeout_sec"`
 	StopTimeoutSec  int `mapstructure:"stop_timeout_sec"`
 
-	// 自定义日志文件路径
-	LogFile string `mapstructure:"log_file"`
-
 	// 环境变量 (map 的键是环境变量名，值是其对应的值)
 	Environment map[string]string `mapstructure:"environment"`
 
 	// 依赖关系 (字符串切片)
 	DependsOn []string `mapstructure:"depends_on"`
+
+	// 日志文件路径
+	LogFile string `mapstructure:"log_file"`
+
+	// 日志轮转配置
+	LogOptions LogOptions `mapstructure:"log_options"`
 }
 
 // Config 是整个配置文件的顶层结构。

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
-
 	"procmate/pkg/config" // 引入 config 包以访问全局配置
+	"strconv"
+	"time"
 )
 
 // ensureCommonRuntimeDir 确保运行时目录存在，并返回其路径。
@@ -32,27 +32,39 @@ func getPidFile(proc config.Process) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(runtimeDir, fmt.Sprintf("%s.pid", proc.Name)), nil
+
+	// 构造 pids 路径
+	pidDir := filepath.Join(runtimeDir, "pids")
+
+	// 确保目录存在
+	if err := os.MkdirAll(pidDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create log directory '%s': %w", pidDir, err)
+	}
+
+	return filepath.Join(pidDir, fmt.Sprintf("%s.pid", proc.Name)), nil
 }
 
 // GetLogFile 返回指定进程的日志文件路径。
-// 如果配置了 log_file，则优先使用用户配置，否则存放在 runtime_dir 下。
 func GetLogFile(proc config.Process) (string, error) {
-	if proc.LogFile != "" {
-		// 检查目录是否存在，不存在就创建
-		dir := filepath.Dir(proc.LogFile)
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return "", err
-		}
-		return proc.LogFile, nil
-	}
-
 	// 默认放在 runtime_dir 下
 	runtimeDir, err := ensureCommonRuntimeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(runtimeDir, fmt.Sprintf("%s.log", proc.Name)), nil
+
+	// 日期作为日志文件名
+	today := time.Now().Format("2006-01-02")
+	logFileName := fmt.Sprintf("%s.log", today)
+
+	// 构造 logs/<proc.Name> 路径
+	logDir := filepath.Join(runtimeDir, "logs", proc.Name)
+
+	// 确保目录存在
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create log directory '%s': %w", logDir, err)
+	}
+
+	return filepath.Join(logDir, logFileName), nil
 }
 
 // SavePid 保存进程 PID 到对应的 .pid 文件。

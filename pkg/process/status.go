@@ -2,35 +2,62 @@ package process
 
 import (
 	"fmt"
-	"net"  // 引入 Go 的网络标准库
-	"time" // 引入时间库，用于设置超时
+	"net"
+	"os"
+	"syscall"
+
+	"procmate/pkg/config"
 )
 
-// CheckPort 函数尝试连接一个指定的 TCP 端口，以确定是否有进程在监听它。
-// port: 需要检查的端口号。
-// 返回值: 如果端口在线则返回 true，否则返回 false。
-func CheckPort(port int) bool {
-	// 构建目标地址字符串，格式为 "host:port"
-	// 我们检查本地主机 127.0.0.1
-	address := fmt.Sprintf("127.0.0.1:%d", port)
-	// 使用 net.DialTimeout 尝试建立一个 TCP 连接。
-	// "tcp": 网络类型。
-	// address: 目标地址。
-	// 1 * time.Second: 设置一个1秒的超时。如果1秒内无法建立连接，函数就会返回一个超时错误。
-	// 这是一个非常重要的设置，可以防止我们的程序在检查一个无响应的端口时卡住太久。
-	conn, err := net.DialTimeout("tcp", address, 1*time.Second)
-
-	// 检查是否发生错误
+// IsRunning 检查指定进程是否由 Procmate 管理且当前正在运行。
+// 通过读取 PID 文件获取 PID，然后向该进程发送 Signal 0 验证其存在性。
+func IsRunning(proc config.Process) bool {
+	// 尝试读取 PID 文件
+	pid, err := ReadPid(proc)
 	if err != nil {
-		// 如果有错误（例如“连接被拒绝”或“超时”），
-		// 就意味着端口是离线的。
+		// 如果读取失败（文件不存在或内容损坏），认为进程未运行
 		return false
 	}
 
-	// 如果 err 为 nil，意味着连接成功建立。
-	// 这说明端口是在线的。
-	// 我们需要立即关闭这个刚刚建立的连接，因为它只是用于探测。
-	defer conn.Close() // defer 关键字确保 conn.Close() 会在函数返回前被执行。
+	// 查找操作系统中的进程
+	// 注意：在 Unix-like 系统上 os.FindProcess 总会成功，即使进程不存在
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		// 理论上非 Windows 系统几乎不会出错
+		return false
+	}
 
-	return true
+	// --- 核心技巧 ---
+	// Signal 0 不会实际发送信号，只会检查进程是否存在以及是否有权限
+	err = process.Signal(syscall.Signal(0))
+
+	// err == nil 表示进程存在且可用
+	return err == nil
+}
+
+// CheckPort 检查指定 TCP 端口是否被占用。
+// 返回 true 表示端口已被占用，false 表示端口空闲。
+func CheckPort(port int) bool {
+	// --- 增加 0 的判断 ---
+	if port == 0 {
+		// 0 被视为跳过检查
+		return true
+	}
+
+	// --- 增加对无效端口的判断 ---
+	if port < 0 || port > 65535 {
+		// 0 或无效端口被视为空闲
+		return false
+	}
+
+	// 尝试在本地建立监听
+	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	if err != nil {
+		// Listen 返回错误通常意味着端口已被占用 (EADDRINUSE)
+		return true
+	}
+
+	// 监听成功，说明端口空闲，立即关闭监听器
+	listener.Close()
+	return false
 }

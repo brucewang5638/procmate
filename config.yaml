@@ -15,39 +15,48 @@ settings:
 
 # 组件列表 (按启动顺序排列)
 processes:
-  # 示例1: 一个模拟的Web服务器
+  # 示例: 一个模拟的Web服务器
   - name: web-server-1
     group: web
     command: "while true; do { echo -e 'HTTP/1.1 200 OK\\r\\n\\r\\nHello from web-server-1'; } | nc -l -p 8080; done"
     workdir: "/tmp"
-    port: 8080
     enabled: true
     # 这个进程使用自定义的启动超时
     start_timeout_sec: 5
 
-  # 示例2: 另一个模拟的API服务
+  # 示例: 另一个模拟的API服务
   - name: api-server-1
     group: api
     command: "while true; do { echo -e 'HTTP/1.1 200 OK\\r\\n\\r\\nHello from api-server-2'; } | nc -l -p 8081; done"
     workdir: "/tmp"
-    port: 8081
     enabled: true
     # ===> 为这个进程注入环境变量
     environment:
       API_KEY: "your-secret-key"
       GIN_MODE: "release"
-    # ===> 自定义日志文件路径
-    # log_file: "/var/log/my_api_server.log"
     # ===> 声明依赖关系(TODO)
     # depends_on:
     #  - "web-server-1"
 
-  # 示例3: 一个被禁用的进程
+  # 示例: 一个持续输出标准日志的服务
+  - name: log-emitter
+    group: testing
+    command: 'while true; do echo "INFO: Heartbeat signal from log-emitter at $(date)"; sleep 2; done | awk ''{ print; fflush() }'''
+    workdir: "/tmp"
+    enabled: true
+
+  # 示例: 一个持续输出错误日志的服务
+  - name: error-emitter
+    group: testing
+    command: 'while true; do echo "ERROR: A simulated critical failure occurred at $(date)"; sleep 5; done > >(awk ''{ print > "/dev/stderr"; fflush() }'') 2>&1'
+    workdir: "/tmp"
+    enabled: true
+
+  # 示例: 一个被禁用的进程
   # enabled: false 意味着 procmate 在执行任何操作时都会忽略这个进程。
   # 这对于我们测试程序的筛选逻辑很有帮助。
   - name: disabled-process
     group: examples
     command: "sleep 3600"
     workdir: "/tmp"
-    port: 9999
     enabled: false

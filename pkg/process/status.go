@@ -17,7 +17,7 @@ import (
 // ProcessInfo 包含了一个进程在运行时的所有动态信息。
 type ProcessInfo struct {
 	Name           string
-	IsOnline       bool
+	IsRunning      bool
 	PID            int
 	Uptime         time.Duration
 	CPUPercent     float64
@@ -56,8 +56,8 @@ func IsRunning(proc config.Process) bool {
 func GetProcessInfo(proc config.Process) (*ProcessInfo, error) {
 	// 初始化返回结构体，默认进程为离线状态
 	info := &ProcessInfo{
-		Name:     proc.Name,
-		IsOnline: false,
+		Name:      proc.Name,
+		IsRunning: false,
 	}
 
 	// 1. 从 PID 文件中读取 PID
@@ -76,7 +76,7 @@ func GetProcessInfo(proc config.Process) (*ProcessInfo, error) {
 	}
 
 	// --- 如果代码能执行到这里，说明进程确认在线 ---
-	info.IsOnline = true
+	info.IsRunning = true
 	info.PID = pid
 
 	// 3. 获取进程的详细运行时信息

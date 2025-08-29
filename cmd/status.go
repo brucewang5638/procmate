@@ -33,8 +33,8 @@ var statusCmd = &cobra.Command{
 			}
 
 			var row []string
-			if info.IsOnline {
-				status := "✅ ONLINE"
+			if info.IsRunning {
+				status := "✅ RUNNING"
 				portsStr := strings.Join(info.ListeningPorts, ",")
 				if portsStr == "" {
 					portsStr = "-"

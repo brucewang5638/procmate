@@ -17,7 +17,7 @@ import (
 func Start(proc config.Process) error {
 	// 检查是否已经运行中
 	if IsRunning(proc) {
-		fmt.Printf("✅ 进程 '%s' 已在运行。\n", proc.Name)
+		fmt.Printf("⚠️ 进程 '%s' 已在运行。\n", proc.Name)
 		return nil
 	}
 
@@ -70,6 +70,5 @@ func Start(proc config.Process) error {
 		return fmt.Errorf("为进程 '%s' 写入 PID 文件失败: %w", proc.Name, err)
 	}
 
-	fmt.Printf("✅ 进程 '%s' 已成功启动 (PID: %d)。\n", proc.Name, pid)
 	return nil
 }

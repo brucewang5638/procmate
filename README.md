@@ -32,17 +32,13 @@
    将编译好的 `procmate` 文件移动到系统的可执行路径下，以便在任何地方都能调用它。
 
    ```bash
-    # 1. 创建目录（如果不存在）
-    sudo mkdir -p /opt/procmate
+    tar -zxf procmate_xxx.tar.gz
 
-    # 2. 移动 procmate 文件到目录中
-    sudo mv procmate /opt/procmate/
+    cd  procmate_xxx
 
-    # 3. 给文件赋予可执行权限（777 表示所有人可读写执行，但 一般建议 755 就够安全）
-    sudo chmod 777 /opt/procmate/procmate
+    chmod +x install.sh
 
-    # 4. 在 /usr/local/bin 创建软链接
-    sudo ln -sf /opt/procmate/procmate /usr/local/bin/procmate
+    ./install.sh
 
    ```
 

@@ -33,7 +33,7 @@ echo ""
 # === 步骤 : 安装配置文件 ===
 sudo mkdir -p /etc/procmate
 echo "正在移动配置文件..."
-sudo mv "${CONFIG_SOURCE_PATH}" /etc/procmate/
+sudo mv "${PROCMATE_CONFIG_PATH}" /etc/procmate/
 echo "✅ 默认配置文件已创建于 /etc/procmate/config.yaml"
 echo ""
 

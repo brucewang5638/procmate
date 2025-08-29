@@ -58,9 +58,9 @@ func checkAndRestartProcesses() {
 			continue
 		}
 
-		isOnline := process.IsRunning(proc)
+		isRunning := process.IsRunning(proc)
 
-		if isOnline {
+		if isRunning {
 			// 绿色 ✅ 表示状态正常
 			fmt.Printf("\033[32m✔️ 进程 '%s' 状态正常\033[0m\n", proc.Name)
 		} else {

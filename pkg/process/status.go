@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"syscall"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 type ProcessInfo struct {
 	Name           string
 	IsRunning      bool
+	IsReady        bool
 	PID            int
 	Uptime         time.Duration
 	CPUPercent     float64
@@ -25,7 +27,7 @@ type ProcessInfo struct {
 	ListeningPorts []string
 }
 
-// IsRunning 检查指定进程是否由 Procmate 管理且当前正在运行。
+// IsRunning 运行中探针。
 // 通过读取 PID 文件获取 PID，然后向该进程发送 Signal 0 验证其存在性。
 func IsRunning(proc config.Process) bool {
 	// 尝试读取 PID 文件
@@ -51,6 +53,57 @@ func IsRunning(proc config.Process) bool {
 	return err == nil
 }
 
+// IsReady 准备就绪探针。
+// 通过读取 PID 文件获取 PID，然后向该进程发送 Signal 0 验证其存在性。
+func IsReady(proc config.Process) (bool, error) {
+	var isReady bool
+	var checkErr error
+	// --- 4. 根据 Port 字段动态选择检查策略 ---
+	if proc.Port > 0 {
+		// 主策略：检查端口
+		isReady, checkErr = checkPort(proc.Port)
+		if isReady {
+			fmt.Printf("成功: 进程 '%s' 的端口 %d 已被监听。\n", proc.Name, proc.Port)
+			return true, nil
+		}
+	} else {
+		// 备用策略：扫描日志
+		logFile, err := GetLogFile(proc)
+		if err != nil {
+			return false, fmt.Errorf("获取日志文件路径失败: %w", err)
+		}
+
+		isReady, checkErr = checkLog(logFile)
+		if isReady {
+			fmt.Printf("成功: 进程 '%s' 的日志中发现就绪信号。\n", proc.Name)
+			return true, nil
+		}
+	}
+
+	// 打印每次检查失败的原因，便于调试
+	if checkErr != nil {
+		// 为了避免日志刷屏，可以只在调试模式下打印
+		fmt.Printf("调试: '%s' 的就绪检查失败: %v\n", proc.Name, checkErr)
+	}
+
+	return false, nil
+}
+
+// checkLog 检查日志文件中是否包含指定的关键字
+func checkLog(logFile string) (bool, error) {
+	// !!! 注意：这是一个硬编码值 !!!
+	readinessPattern := "started successfully"
+
+	content, err := os.ReadFile(logFile)
+	if err != nil {
+		return false, fmt.Errorf("读取日志文件 %s 失败: %w", logFile, err)
+	}
+	if strings.Contains(string(content), readinessPattern) {
+		return true, nil // 找到了！
+	}
+	return false, fmt.Errorf("在 %s 中未找到关键字 '%s'", logFile, readinessPattern)
+}
+
 // GetProcessInfo 通过PID文件和系统调用，获取一个进程的详细运行时信息。
 // 这是获取进程状态的核心功能，将系统交互的逻辑与命令行展示的逻辑彻底分离。
 func GetProcessInfo(proc config.Process) (*ProcessInfo, error) {
@@ -59,7 +112,6 @@ func GetProcessInfo(proc config.Process) (*ProcessInfo, error) {
 		Name:      proc.Name,
 		IsRunning: false,
 	}
-
 	// 1. 从 PID 文件中读取 PID
 	pid, err := ReadPid(proc)
 	if err != nil || pid == 0 {
@@ -77,6 +129,10 @@ func GetProcessInfo(proc config.Process) (*ProcessInfo, error) {
 
 	// --- 如果代码能执行到这里，说明进程确认在线 ---
 	info.IsRunning = true
+
+	isReady, _ := IsReady(proc)
+	info.IsReady = isReady
+
 	info.PID = pid
 
 	// 3. 获取进程的详细运行时信息
@@ -114,29 +170,29 @@ func GetProcessInfo(proc config.Process) (*ProcessInfo, error) {
 	return info, nil
 }
 
-// CheckPort 检查指定 TCP 端口是否被占用。
+// checkPort 检查指定 TCP 端口是否被占用。
 // 返回 true 表示端口已被占用，false 表示端口空闲。
-func CheckPort(port int) bool {
+func checkPort(port int) (bool, error) {
 	// --- 增加 0 的判断 ---
 	if port == 0 {
 		// 0 被视为跳过检查
-		return true
+		return true, nil
 	}
 
 	// --- 增加对无效端口的判断 ---
 	if port < 0 || port > 65535 {
-		// 0 或无效端口被视为空闲
-		return false
+		// 无效端口被视为空闲
+		return false, fmt.Errorf("端口无效 %d", port)
 	}
 
 	// 尝试在本地建立监听
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		// Listen 返回错误通常意味着端口已被占用 (EADDRINUSE)
-		return true
+		return true, nil
 	}
 
 	// 监听成功，说明端口空闲，立即关闭监听器
 	listener.Close()
-	return false
+	return false, nil
 }

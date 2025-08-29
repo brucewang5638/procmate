@@ -58,11 +58,25 @@ func checkAndRestartProcesses() {
 			continue
 		}
 
+		// 检查是否允许正常
 		isRunning := process.IsRunning(proc)
+		isReady, err := process.IsReady(proc)
+		if err != nil {
+			fmt.Printf("❌ 检查进程就绪状态失败: %v\033[0m\n", err)
+			return
+		}
 
 		if isRunning {
-			// 绿色 ✅ 表示状态正常
-			fmt.Printf("\033[32m✔️ 进程 '%s' 状态正常\033[0m\n", proc.Name)
+			if isReady {
+				// 绿色表示运行且就绪
+				fmt.Printf("\033[32m✔️ 进程 '%s' 运行中且就绪\033[0m\n", proc.Name)
+			} else {
+				// 黄色表示运行但未就绪
+				fmt.Printf("\033[33m♻️ 进程 '%s' 运行中，但未就绪\033[0m\n", proc.Name)
+
+				// 检查是否超时，如果超时就kill
+				checkProcessTimeoutNoReady(proc)
+			}
 		} else {
 			// 红色 🚨 表示离线警告
 			fmt.Printf("\033[31m🚨 警告: 进程 '%s' 离线！\033[0m\n", proc.Name)
@@ -74,6 +88,36 @@ func checkAndRestartProcesses() {
 			}
 		}
 
+	}
+}
+
+// checkProcessTimeoutNoReady 等待一个已启动的进程达到就绪状态，如果超时则终止它
+func checkProcessTimeoutNoReady(proc config.Process) {
+	// 计算超时时间
+	timeoutSec := proc.StartTimeoutSec
+	if timeoutSec <= 0 {
+		timeoutSec = config.Cfg.Settings.DefaultStartTimeoutSec
+	}
+	if timeoutSec <= 0 {
+		timeoutSec = 60 // 提供一个最终的默认值，防止两者都未配置
+	}
+	timeoutDuration := time.Duration(timeoutSec) * time.Second
+
+	info, err := process.GetProcessInfo(proc)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "获取进程 '%s' 信息时发生意外错误: %v\n", proc.Name, err)
+		return
+	}
+
+	// 如果运行时间超过了配置的超时阈值，则认为进程卡住，执行终止操作。
+	if info.Uptime > timeoutDuration {
+		fmt.Printf("\033[31m🚨 警告: 进程 '%s' 运行已超过 %d 秒但仍未就绪，将被强制终止。\033[0m\n", proc.Name, timeoutDuration)
+
+		if err := process.Stop(proc); err != nil {
+			fmt.Printf("\033[31m❌ 终止超时进程 '%s' 失败: %v\033[0m\n", proc.Name, err)
+		} else {
+			fmt.Printf("\033[33m⚡ 超时进程 '%s' 已成功终止。\033[0m\n", proc.Name)
+		}
 	}
 }
 

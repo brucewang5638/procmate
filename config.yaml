@@ -5,8 +5,8 @@
 settings:
   # 运行时文件的根目录 (用于存放 pid 和 logs)
   runtime_dir: /tmp/procmate
-  # 默认的启动超时时间 (秒)(已废弃)
-  # default_start_timeout_sec: 10
+  # 默认的启动超时时间 (秒)
+  default_start_timeout_sec: 60
   # 默认的停止超时时间 (秒)
   default_stop_timeout_sec: 10
   # 'watch' 命令的轮询周期 (秒)
@@ -27,6 +27,7 @@ processes:
     command: "while true; do { echo -e 'HTTP/1.1 200 OK\\r\\n\\r\\nHello from web-server-1'; } | nc -l -p 8080; done"
     workdir: "/tmp"
     enabled: true
+    port: 8080
     # 这个进程使用自定义的停止超时
     stop_timeout_sec: 15
 
@@ -36,6 +37,7 @@ processes:
     command: "while true; do { echo -e 'HTTP/1.1 200 OK\\r\\n\\r\\nHello from api-server-2'; } | nc -l -p 8081; done"
     workdir: "/tmp"
     enabled: true
+    port: 8081
     # ===> 为这个进程注入环境变量
     environment:
       API_KEY: "your-secret-key"

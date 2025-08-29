@@ -4,6 +4,12 @@ import (
 	"github.com/spf13/viper" // 引入 viper 库
 )
 
+// Config 是整个配置文件的顶层结构。
+type Config struct {
+	Settings  Settings  `mapstructure:"settings"`
+	Processes []Process `mapstructure:"processes"`
+}
+
 // Settings 结构体对应配置文件中的 'settings' 部分。
 type Settings struct {
 	RuntimeDir             string     `mapstructure:"runtime_dir"`
@@ -11,15 +17,6 @@ type Settings struct {
 	DefaultStopTimeoutSec  int        `mapstructure:"default_stop_timeout_sec"`
 	WatchIntervalSec       int        `mapstructure:"watch_interval_sec"`
 	LogOptions             LogOptions `mapstructure:"log_options"`
-}
-
-// LogOptions 结构体对应 'log_options' 部分，用于配置日志轮转。
-type LogOptions struct {
-	MaxSizeMB  int  `mapstructure:"max_size_mb"`
-	MaxBackups int  `mapstructure:"max_backups"`
-	MaxAgeDays int  `mapstructure:"max_age_days"`
-	Compress   bool `mapstructure:"compress"`
-	LocalTime  bool `mapstructure:"localTime"`
 }
 
 // Process 结构体对应 'processes' 列表中的每一个进程项。
@@ -43,10 +40,13 @@ type Process struct {
 	DependsOn []string `mapstructure:"depends_on"`
 }
 
-// Config 是整个配置文件的顶层结构。
-type Config struct {
-	Settings  Settings  `mapstructure:"settings"`
-	Processes []Process `mapstructure:"processes"`
+// LogOptions 结构体对应 'log_options' 部分，用于配置日志轮转。
+type LogOptions struct {
+	MaxSizeMB  int  `mapstructure:"max_size_mb"`
+	MaxBackups int  `mapstructure:"max_backups"`
+	MaxAgeDays int  `mapstructure:"max_age_days"`
+	Compress   bool `mapstructure:"compress"`
+	LocalTime  bool `mapstructure:"localTime"`
 }
 
 // Cfg 是一个指向 Config 实例的全局指针，用于在程序各处访问配置。

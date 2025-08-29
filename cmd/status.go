@@ -34,7 +34,12 @@ var statusCmd = &cobra.Command{
 
 			var row []string
 			if info.IsRunning {
-				status := "✅ RUNNING"
+				var status = "♻️ RUNNING"
+
+				if info.IsReady {
+					status = "✅ READY"
+				}
+
 				portsStr := strings.Join(info.ListeningPorts, ",")
 				if portsStr == "" {
 					portsStr = "-"

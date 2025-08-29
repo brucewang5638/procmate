@@ -13,9 +13,7 @@ var ErrPidfileNotFound = errors.New("pidfile not found")
 
 // Stop 负责停止一个指定的进程。
 func Stop(proc config.Process) error {
-	// fmt.Printf("正在尝试停止进程: %s...\n", proc.Name)
-
-	// ===> 使用 ReadPid 辅助函数 <===
+	// ===> 读取pid <===
 	pid, err := ReadPid(proc)
 	if err != nil {
 		if errors.Is(err, ErrPidfileNotFound) {
@@ -65,7 +63,5 @@ func Stop(proc config.Process) error {
 		return fmt.Errorf("清理 PID 文件失败: %w", err)
 	}
 
-	// 保持沉默由cmd发声
-	// fmt.Printf("✅ 进程 '%s' 已成功停止。\n", proc.Name)
 	return nil
 }

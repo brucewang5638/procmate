@@ -19,6 +19,7 @@ type LogOptions struct {
 	MaxBackups int  `mapstructure:"max_backups"`
 	MaxAgeDays int  `mapstructure:"max_age_days"`
 	Compress   bool `mapstructure:"compress"`
+	LocalTime  bool `mapstructure:"localTime"`
 }
 
 // Process 结构体对应 'processes' 列表中的每一个进程项。

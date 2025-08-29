@@ -20,10 +20,14 @@ var watchCmd = &cobra.Command{
 如果发现某个进程离线，则会自动尝试重新启动它。`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("✅ procmate 守护模式已启动... (按 Ctrl+C 退出)")
-		fmt.Println("每10秒检查一次所有已启用进程的状态。")
 
-		// 创建定时器，每10秒触发一次
-		ticker := time.NewTicker(10 * time.Second)
+		watchInterval := config.Cfg.Settings.WatchIntervalSec
+
+		fmt.Printf("每 %d 秒检查一次所有已启用进程的状态。\n", watchInterval)
+
+		// 创建定时器，每 watchInterval 秒触发一次
+		ticker := time.NewTicker(time.Duration(watchInterval) * time.Second)
+
 		defer ticker.Stop()
 
 		// 捕获退出信号
@@ -54,14 +58,14 @@ func checkAndRestartProcesses() {
 			continue
 		}
 
-		isOnline := process.CheckPort(proc.Port)
+		isOnline := process.IsRunning(proc)
 
 		if isOnline {
 			// 绿色 ✅ 表示状态正常
-			fmt.Printf("\033[32m✔️ 进程 '%s' 状态正常 (端口: %d 在线)\033[0m\n", proc.Name, proc.Port)
+			fmt.Printf("\033[32m✔️ 进程 '%s' 状态正常\033[0m\n", proc.Name)
 		} else {
 			// 红色 🚨 表示离线警告
-			fmt.Printf("\033[31m🚨 警告: 进程 '%s' (端口: %d) 离线！\033[0m\n", proc.Name, proc.Port)
+			fmt.Printf("\033[31m🚨 警告: 进程 '%s' 离线！\033[0m\n", proc.Name)
 			// 尝试自动重启
 			if err := process.Start(proc); err != nil {
 				fmt.Printf("\033[31m❌ 自动重启进程 '%s' 失败: %v\033[0m\n", proc.Name, err)
@@ -69,6 +73,7 @@ func checkAndRestartProcesses() {
 				fmt.Printf("\033[33m⚡ 进程 '%s' 已自动重启。\033[0m\n", proc.Name)
 			}
 		}
+
 	}
 }
 

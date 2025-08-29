@@ -5,18 +5,20 @@
 settings:
   # 运行时文件的根目录 (用于存放 pid 和 logs)
   runtime_dir: /tmp/procmate
-  # 默认的启动超时时间 (秒)
-  default_start_timeout_sec: 10
+  # 默认的启动超时时间 (秒)(已废弃)
+  # default_start_timeout_sec: 10
   # 默认的停止超时时间 (秒)
   default_stop_timeout_sec: 10
   # 'watch' 命令的轮询周期 (秒)
   watch_interval_sec: 10
   # 日志配置
   log_options:
-    max_size_mb: 1
-    max_backups: 3
-    max_age_days: 30
-    compress: true
+    max_size_mb: 10000 # 在轮转之前，日志文件的最大大小（以MB为单位）
+    max_backups: 10 # 保留的旧日志文件的最大数量
+    max_age_days: 30 # 保留旧日志文件的最大天数
+    compress: true # 是否压缩/归档旧日志文件
+    localTime: true # 使用本地时间创建时间戳
+
 # 组件列表 (按启动顺序排列)
 processes:
   # 示例: 一个模拟的Web服务器
@@ -25,8 +27,8 @@ processes:
     command: "while true; do { echo -e 'HTTP/1.1 200 OK\\r\\n\\r\\nHello from web-server-1'; } | nc -l -p 8080; done"
     workdir: "/tmp"
     enabled: true
-    # 这个进程使用自定义的启动超时
-    start_timeout_sec: 5
+    # 这个进程使用自定义的停止超时
+    stop_timeout_sec: 15
 
   # 示例: 另一个模拟的API服务
   - name: api-server-1

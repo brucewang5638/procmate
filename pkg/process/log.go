@@ -1,13 +1,10 @@
 package process
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"procmate/pkg/config"
-	"time"
 
-	"github.com/fatih/color"
 	"github.com/hpcloud/tail"
 )
 
@@ -21,15 +18,8 @@ func TailLog(proc config.Process) error {
 
 	// 检查日志文件是否存在
 	if _, err := os.Stat(logFilePath); os.IsNotExist(err) {
-		fmt.Printf("⏳ 今日 '%s' 没有日志 (预期文件: %s)\n", proc.Name, logFilePath)
-		fmt.Println("等待新日志生成...")
+		fmt.Printf("📃 进程 '%s' 没有日志 (预期文件: %s)\n", proc.Name, logFilePath)
 	}
-
-	// --- 创建不同场景的颜色打印机 ---
-	colorTime := color.New(color.FgWhite).Add(color.Faint) // 时间戳用灰色
-	colorApp := color.New(color.FgCyan)                    // 应用名用青色
-	colorStdout := color.New(color.FgGreen)                // stdout 用绿色
-	colorStderr := color.New(color.FgRed)                  // stderr 用红色
 
 	// 使用 tail 库追踪日志文件
 	t, err := tail.TailFile(logFilePath, tail.Config{
@@ -37,40 +27,18 @@ func TailLog(proc config.Process) error {
 		Follow:    true,  // 类似 tail -f
 		MustExist: false, // 文件不存在时等待创建
 	})
+
 	if err != nil {
 		return fmt.Errorf("无法开始追踪日志文件 '%s': %w", logFilePath, err)
 	}
 
 	fmt.Printf("👀 正在追踪 '%s' 的日志，按 Ctrl+C 退出\n", proc.Name)
 
-	// --- 循环处理每一行日志 ---
+	// --- 步骤 3: 循环打印日志内容 ---
+	// 从 tail 的通道中读取新的日志行
 	for line := range t.Lines {
-		var entry LogEntry
-		// 尝试将行文本解析为 JSON
-		if err := json.Unmarshal([]byte(line.Text), &entry); err == nil {
-			// --- 解析成功，进行美化输出 ---
-
-			// 1. 打印时间戳和应用名
-			parsedTime, err := time.Parse(time.RFC3339, entry.Timestamp)
-			if err != nil {
-				colorTime.Printf("[%s] ", entry.Timestamp) // 解析失败则打印原始时间
-			} else {
-				colorTime.Printf("[%s] ", parsedTime.Format("15:04:05")) // 只显示时分秒
-			}
-			colorApp.Printf("[%s] ", entry.App)
-
-			// 2. 根据日志流 (stdout/stderr) 选择不同颜色打印消息
-			if entry.Stream == "stderr" {
-				colorStderr.Printf("[stderr]: %s\n", entry.Message)
-			} else {
-				colorStdout.Printf("[stdout]: %s\n", entry.Message)
-			}
-
-		} else {
-			// --- 解析失败，直接打印原文 ---
-			// 保证对非 JSON 格式日志的兼容性
-			fmt.Println(line.Text)
-		}
+		// 直接打印从文件中读取到的原始文本行
+		fmt.Println(line.Text)
 	}
 
 	return nil

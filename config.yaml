@@ -28,6 +28,7 @@ processes:
     workdir: "/tmp"
     enabled: true
     port: 8080
+    # ready_check_model: port
     # 这个进程使用自定义的停止超时
     stop_timeout_sec: 15
     depends_on:
@@ -40,6 +41,7 @@ processes:
     workdir: "/tmp"
     enabled: true
     port: 8081
+    # ready_check_model: port
     # ===> 为这个进程注入环境变量
     environment:
       API_KEY: "your-secret-key"

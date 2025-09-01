@@ -15,8 +15,9 @@ import (
 // - 否则，日志将被丢弃。
 // - 写入 PID 文件。
 func Start(proc config.Process) error {
-	// 检查是否已经运行中
-	if IsRunning(proc) {
+	// 检查进程是否已在运行
+	isRunning, _ := IsRunning(proc)
+	if isRunning {
 		fmt.Printf("⚠️ 进程 '%s' 已在运行。\n", proc.Name)
 		return nil
 	}

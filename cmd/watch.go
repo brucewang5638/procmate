@@ -59,7 +59,7 @@ func checkAndRestartProcesses() {
 		}
 
 		// 检查是否允许正常
-		isRunning := process.IsRunning(proc)
+		isRunning, _ := process.IsRunning(proc)
 		isReady, err := process.IsReady(proc)
 		if err != nil {
 			fmt.Printf("❌ 检查进程就绪状态失败: %v\033[0m\n", err)

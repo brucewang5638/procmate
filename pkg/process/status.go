@@ -29,12 +29,12 @@ type ProcessInfo struct {
 
 // IsRunning 运行中探针。
 // 通过读取 PID 文件获取 PID，然后向该进程发送 Signal 0 验证其存在性。
-func IsRunning(proc config.Process) bool {
+func IsRunning(proc config.Process) (bool, error) {
 	// 尝试读取 PID 文件
 	pid, err := ReadPid(proc)
 	if err != nil {
 		// 如果读取失败（文件不存在或内容损坏），认为进程未运行
-		return false
+		return false, fmt.Errorf("获取 PID 文件路径失败: %w", err)
 	}
 
 	// 查找操作系统中的进程
@@ -42,7 +42,7 @@ func IsRunning(proc config.Process) bool {
 	process, err := os.FindProcess(pid)
 	if err != nil {
 		// 理论上非 Windows 系统几乎不会出错
-		return false
+		return false, fmt.Errorf("进程查询失败: %w", err)
 	}
 
 	// --- 核心技巧 ---
@@ -50,7 +50,7 @@ func IsRunning(proc config.Process) bool {
 	err = process.Signal(syscall.Signal(0))
 
 	// err == nil 表示进程存在且可用
-	return err == nil
+	return err == nil, nil
 }
 
 // IsReady 准备就绪探针。
@@ -63,7 +63,6 @@ func IsReady(proc config.Process) (bool, error) {
 		// 主策略：检查端口
 		isReady, checkErr = checkPort(proc.Port)
 		if isReady {
-			fmt.Printf("成功: 进程 '%s' 的端口 %d 已被监听。\n", proc.Name, proc.Port)
 			return true, nil
 		}
 	} else {

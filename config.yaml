@@ -30,6 +30,8 @@ processes:
     port: 8080
     # 这个进程使用自定义的停止超时
     stop_timeout_sec: 15
+    depends_on:
+     - api-server-1
 
   # 示例: 另一个模拟的API服务
   - name: api-server-1
@@ -42,9 +44,6 @@ processes:
     environment:
       API_KEY: "your-secret-key"
       GIN_MODE: "release"
-    # ===> 声明依赖关系(TODO)
-    # depends_on:
-    #  - "web-server-1"
 
   # 示例: 一个持续输出标准日志的服务
   - name: log-emitter

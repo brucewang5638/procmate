@@ -7,56 +7,56 @@
 PROCMATE_SOURCE_PATH="${1:-.}"
 PROCMATE_BINARY_PATH="${PROCMATE_SOURCE_PATH}/procmate"
 PROCMATE_CONFIG_PATH="${PROCMATE_SOURCE_PATH}/config.yaml"
-PROCMATE_CONFD_PATH="${PROCMATE_SOURCE_PATH}/procmate.d"
 PROCMATE_SERVICE_PATH="${PROCMATE_SOURCE_PATH}/release-scripts/procmate.service" # <-- 新增
 
-# 检查 procmate 文件是否存在于指定路径
+# === 统一定义安装目标路径 ===
+PROCMATE_INSTALL_DIR="/opt/procmate"
+PROCMATE_BIN_LINK="/usr/local/bin/procmate"
+PROCMATE_ETC_DIR="/etc/procmate"
+PROCMATE_SERVICE_TARGET="/etc/systemd/system/procmate.service"
+
+# === 步骤 0: 文件检查 ===
 if [ ! -f "${PROCMATE_BINARY_PATH}" ]; then
     echo "错误: 在路径 '${PROCMATE_BINARY_PATH}' 下找不到 'procmate' 可执行文件。"
     exit 1
 fi
 
-# 检查 config.yaml 文件是否存在于指定路径
 if [ ! -f "${PROCMATE_CONFIG_PATH}" ]; then
     echo "错误: 在路径 '${PROCMATE_CONFIG_PATH}' 下找不到 'config.yaml' 配置文件。"
     exit 1
 fi
 
-# <-- 检查 procmate.d 目录是否存在 -->
-if [ ! -d "${PROCMATE_CONFD_PATH}" ]; then
-    echo "错误: 在路径 '${PROCMATE_CONFD_PATH}' 下找不到 'procmate.d' 配置目录。"
-    exit 1
-fi
-
-# 检查 procmate.service 文件是否存在 #
 if [ ! -f "${PROCMATE_SERVICE_PATH}" ]; then
     echo "错误: 在路径 '${PROCMATE_SERVICE_PATH}' 下找不到 'procmate.service' 服务文件。"
     exit 1
 fi
 
-# === 步骤 1: 安装 procmate 二进制文件 ===
+# === 步骤 1: 安装二进制 ===
 echo "正在安装 procmate 程序..."
-sudo mkdir -p /opt/procmate
-# 使用 cp 代替 mv，这在安装脚本中是更常见的做法
-sudo cp "${PROCMATE_BINARY_PATH}" /opt/procmate/
-sudo chmod 755 /opt/procmate/procmate
-sudo ln -sf /opt/procmate/procmate /usr/local/bin/procmate
+sudo mkdir -p "${PROCMATE_INSTALL_DIR}"
+sudo cp "${PROCMATE_BINARY_PATH}" "${PROCMATE_INSTALL_DIR}/"
+sudo chmod 755 "${PROCMATE_INSTALL_DIR}/procmate"
+sudo ln -sf "${PROCMATE_INSTALL_DIR}/procmate" "${PROCMATE_BIN_LINK}"
 echo "✅ 程序已安装!"
 echo ""
 
 # === 步骤 2: 安装配置文件 ===
-sudo mkdir -p /etc/procmate
 echo "正在复制配置文件..."
-# 使用 cp 代替 mv
-sudo cp "${PROCMATE_CONFIG_PATH}" /etc/procmate/
-# <-- 新增：递归复制 procmate.d 目录 -->
-sudo cp -r "${PROCMATE_CONFD_PATH}" /etc/procmate/
-echo "✅ 默认配置文件已创建于 /etc/procmate/"
+sudo mkdir -p "${PROCMATE_ETC_DIR}"
+sudo cp "${PROCMATE_CONFIG_PATH}" "${PROCMATE_ETC_DIR}/"
+echo "✅ 默认主配置文件已创建于 ${PROCMATE_ETC_DIR}/"
+# 确保 procmate.d 目录存在
+if [ ! -d "${PROCMATE_ETC_DIR}/procmate.d" ]; then
+    sudo mkdir -p "${PROCMATE_ETC_DIR}/procmate.d"
+    echo "✅ 默认子配置文件目录已创建于 ${PROCMATE_ETC_DIR}/procmate.d"
+else
+    echo "ℹ️ 已存在 ${PROCMATE_ETC_DIR}/procmate.d，跳过创建。"
+fi
 echo ""
 
-# === 步骤 3: 设置 systemd 服务 ===
+# === 步骤 3: 安装 systemd 服务 ===
 echo "正在设置 systemd 服务..."
-sudo cp "${PROCMATE_SERVICE_PATH}" /etc/systemd/system/procmate.service
+sudo cp "${PROCMATE_SERVICE_PATH}" "${PROCMATE_SERVICE_TARGET}"
 sudo systemctl daemon-reload
 sudo systemctl enable procmate
 echo "✅ procmate 服务已启用，将在下次启动时自动运行。"

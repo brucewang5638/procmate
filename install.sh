@@ -7,8 +7,6 @@
 PROCMATE_SOURCE_PATH="${1:-.}"
 PROCMATE_BINARY_PATH="${PROCMATE_SOURCE_PATH}/procmate"
 PROCMATE_CONFIG_PATH="${PROCMATE_SOURCE_PATH}/config.yaml"
-PROCMATE_SERVICE_PATH="${PROCMATE_SOURCE_PATH}/release-scripts/procmate.service" # <-- 新增
-
 # === 统一定义安装目标路径 ===
 PROCMATE_INSTALL_DIR="/opt/procmate"
 PROCMATE_BIN_LINK="/usr/local/bin/procmate"
@@ -23,11 +21,6 @@ fi
 
 if [ ! -f "${PROCMATE_CONFIG_PATH}" ]; then
     echo "错误: 在路径 '${PROCMATE_CONFIG_PATH}' 下找不到 'config.yaml' 配置文件。"
-    exit 1
-fi
-
-if [ ! -f "${PROCMATE_SERVICE_PATH}" ]; then
-    echo "错误: 在路径 '${PROCMATE_SERVICE_PATH}' 下找不到 'procmate.service' 服务文件。"
     exit 1
 fi
 
@@ -55,8 +48,26 @@ fi
 echo ""
 
 # === 步骤 3: 安装 systemd 服务 ===
-echo "正在设置 systemd 服务..."
-sudo cp "${PROCMATE_SERVICE_PATH}" "${PROCMATE_SERVICE_TARGET}"
+echo "正在创建并启用 systemd 服务..."
+
+# 使用 Heredoc 将 service 文件内容直接写入目标路径
+sudo tee "${PROCMATE_SERVICE_TARGET}" > /dev/null <<EOF
+[Unit]
+Description=Procmate Process Manager
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=${PROCMATE_BIN_LINK} watch
+Restart=on-failure
+RestartSec=5s
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 重载并启用服务
 sudo systemctl daemon-reload
 sudo systemctl enable procmate
 echo "✅ procmate 服务已启用，将在下次启动时自动运行。"

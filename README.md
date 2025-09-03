@@ -44,28 +44,54 @@
 
 ## ⚙️ 配置
 
-`procmate` 的所有行为都由一个 `config.yaml` 文件控制。您需要在使用前创建这个文件。
+`procmate` 采用分层配置系统，清晰地将全局设置与单个进程定义分离开来。默认配置路径位于 `/etc/procmate/`。
 
-**示例 `config.yaml`:**
+### 1. 主配置文件: `config.yaml`
+
+该文件负责定义全局设置和指定服务配置目录。
+
+-   **`settings`**: 定义全局参数，如默认超时、日志轮转策略等。
+-   **`include`**: 一个关键指令，告诉 `procmate` 去哪里加载所有的服务定义文件。它支持 [glob](https://en.wikipedia.org/wiki/Glob_(programming)) 模式。
+
+**示例 `/etc/procmate/config.yaml`:**
 
 ```yaml
 # 全局默认设置
 settings:
   runtime_dir: /tmp/procmate # 运行时文件 (pid, logs) 的根目录
-  default_start_timeout_sec: 10 # 默认启动超时 (秒)
+  default_start_timeout_sec: 60 # 默认启动超时 (秒)
   default_stop_timeout_sec: 10 # 默认停止超时 (秒)
   watch_interval_sec: 10 # 'watch' 命令的轮询周期 (秒)
+  log_options:
+    max_size_mb: 10000
+    max_backups: 10
+    max_age_days: 30
+    compress: true
+    localTime: true
 
+# 指向服务定义文件所在的目录
+include: "procmate.d/*.yaml"
+```
+
+### 2. 服务定义目录: `procmate.d/`
+
+该目录下的每一个 `.yaml` 文件都用于定义一组相关的进程。这种方式使得添加、删除和管理单个服务变得非常模块化和清晰。
+
+**示例 `/etc/procmate/procmate.d/web_services.yaml`:**
+
+```yaml
+# 定义一组 Web 相关的服务
 processes:
   - name: web-server-1
     group: web
-    command: "while true; do { echo -e 'HTTP/1.1 200 OK\\r\\n\\r\\nHello'; } | nc -l -p 8080; done"
+    command: "while true; do { echo -e 'HTTP/1.1 200 OK\r\n\r\nHello'; } | nc -l -p 8080; done"
     workdir: "/tmp"
     port: 8080
     enabled: true
-    start_timeout_sec: 5 # 使用自定义的启动超时
+    depends_on:
+     - api-server-1
 
-  - name: api-server-2
+  - name: api-server-1
     group: api
     command: "..."
     workdir: "/app/api"
@@ -73,8 +99,10 @@ processes:
     enabled: true
     environment:
       API_KEY: "your-secret-key"
-    log_file: "/var/log/my_api_server.log"
 ```
+
+**注意**: 如果多个文件中定义了同名的进程，后加载的文件会覆盖先加载的，并且 `procmate` 会在启动时打印警告信息。
+
 
 ## 💡 使用方法
 
@@ -126,47 +154,28 @@ processes:
 
 ## 🛡️ 作为 Systemd 服务运行
 
-为了实现后台守护和开机自启，建议将 `procmate` 注册为一个 `systemd` 服务。
+`procmate` 被设计为在 `systemd`下作为服务运行，以实现后台守护和开机自启。
 
-1. **创建服务文件**
+项目提供的 `install.sh` 脚本会自动完成服务的安装和启用。您无需手动创建服务文件。
 
-   ```bash
-   sudo nano /etc/systemd/system/procmate.service
-   ```
+安装完成后，您可以使用标准的 `systemctl` 命令来管理 `procmate` 服务：
 
-2. **填入以下内容** (请务必使用您配置文件的真实绝对路径):
+-   **启动服务**
+    ```bash
+    sudo systemctl start procmate
+    ```
 
-   ```ini
-   [Unit]
-   Description=Procmate Process Companion Service
-   After=network.target
+-   **查看服务状态**
+    ```bash
+    sudo systemctl status procmate
+    ```
 
-   [Service]
-   Type=simple
-   ExecStart=/usr/local/bin/procmate watch --config /path/to/your/config.yaml
-   User=root
-   Restart=on-failure
-   RestartSec=5s
+-   **停止服务**
+    ```bash
+    sudo systemctl stop procmate
+    ```
 
-   [Install]
-   WantedBy=multi-user.target
-   ```
-
-3. **管理服务**
-
-   ```bash
-   # 重载 systemd 配置
-   sudo systemctl daemon-reload
-
-   # 设置开机自启
-   sudo systemctl enable procmate.service
-
-   # 立即启动服务
-   sudo systemctl start procmate.service
-
-   # 查看服务状态
-   sudo systemctl status procmate.service
-
-   # 查看实时日志
-   sudo journalctl -u procmate.service -f
-   ```
+-   **查看实时日志**
+    ```bash
+    sudo journalctl -u procmate -f
+    ```

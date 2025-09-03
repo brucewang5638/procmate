@@ -1,6 +1,9 @@
 package config
 
 import (
+	"fmt"
+	"path/filepath"
+
 	"github.com/spf13/viper" // 引入 viper 库
 )
 
@@ -8,6 +11,7 @@ import (
 type Config struct {
 	Settings  Settings  `mapstructure:"settings"`
 	Processes []Process `mapstructure:"processes"`
+	Include   string    `mapstructure:"include"`
 }
 
 // Settings 结构体对应配置文件中的 'settings' 部分。
@@ -53,26 +57,60 @@ type LogOptions struct {
 var Cfg *Config
 
 // LoadConfig 使用 Viper 读取和解析配置文件。
-// 注意：Viper 的 Unmarshal 会自动处理新字段。
+// 最新版本支持 'include' 指令，并能处理重名进程（后来者覆盖）并发出警告。
 func LoadConfig(path string) error {
 	v := viper.New()
+	v.SetConfigFile(path)
 
-	// 2. 设置配置文件路径和名称
-	v.SetConfigFile(path)   // 直接指定完整配置文件路径
-	v.SetConfigType("yaml") // 明确指定配置文件类型为 YAML
-
-	// 3. 读取配置文件
+	// 读取主配置文件
 	if err := v.ReadInConfig(); err != nil {
-		return err
+		return fmt.Errorf("failed to read main config: %w", err)
 	}
-
-	// 4. 将配置反序列化到 Cfg 全局变量中
-	//    v.Unmarshal() 会解析配置并将其内容填充到传入的指针指向的结构体中。
-	//    我们传入 &Cfg，因为 Cfg本身是一个指针，我们需要传递它的地址，
-	//    以便 Unmarshal 能够修改 Cfg使其指向一个新的、填充好数据的 Config 实例。
+	// 主配置反序列化入全局变量
 	if err := v.Unmarshal(&Cfg); err != nil {
-		return err
+		return fmt.Errorf("failed to unmarshal main config: %w", err)
 	}
 
+	finalProcesses := make([]Process, 0)
+	seenProcs := make(map[string]int) // K: 进程名, V: 在 finalProcesses 中的索引
+
+	// 定义一个闭包，用于处理一个进程列表（来自主文件或 include 文件）
+	process := func(procs []Process, sourceFile string) {
+		for _, p := range procs {
+			if index, exists := seenProcs[p.Name]; exists {
+				fmt.Printf("Warning: Duplicate process '%s' in %s overwrites previous definition.\n", p.Name, sourceFile)
+				finalProcesses[index] = p // 覆盖
+			} else {
+				finalProcesses = append(finalProcesses, p) // 追加
+				seenProcs[p.Name] = len(finalProcesses) - 1
+			}
+		}
+	}
+
+	//  处理主配置文件中的进程
+	process(Cfg.Processes, path)
+
+	//  处理 include 文件
+	if Cfg.Include != "" {
+		globPath := filepath.Join(filepath.Dir(path), Cfg.Include)
+		if files, err := filepath.Glob(globPath); err == nil {
+			// 循环子配置文件
+			for _, file := range files {
+				includeViper := viper.New()
+				includeViper.SetConfigFile(file)
+				if includeViper.ReadInConfig() == nil {
+					var tempCfg struct {
+						Processes []Process `mapstructure:"processes"`
+					}
+					if includeViper.Unmarshal(&tempCfg) == nil {
+						process(tempCfg.Processes, file)
+					}
+				}
+			}
+		}
+	}
+
+	// 3. 将最终结果赋回全局配置
+	Cfg.Processes = finalProcesses
 	return nil
 }

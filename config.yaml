@@ -1,4 +1,4 @@
-# procmate 进程伴侣配置文件
+# procmate 进程伴侣主配置文件
 # 该文件用于定义和管理所有需要被监控和管理的组件与服务。
 
 # 基础配置
@@ -19,53 +19,7 @@ settings:
     compress: true # 是否压缩/归档旧日志文件
     localTime: true # 使用本地时间创建时间戳
 
-# 组件列表 (按启动顺序排列)
-processes:
-  # 示例: 一个模拟的Web服务器
-  - name: web-server-1
-    group: web
-    command: "while true; do { echo -e 'HTTP/1.1 200 OK\\r\\n\\r\\nHello from web-server-1'; } | nc -l -p 8080; done"
-    workdir: "/tmp"
-    enabled: true
-    port: 8080
-    # ready_check_model: port
-    # 这个进程使用自定义的停止超时
-    stop_timeout_sec: 15
-    depends_on:
-     - api-server-1
+include: "procmate.d/*.yaml"
 
-  # 示例: 另一个模拟的API服务
-  - name: api-server-1
-    group: api
-    command: "while true; do { echo -e 'HTTP/1.1 200 OK\\r\\n\\r\\nHello from api-server-2'; } | nc -l -p 8081; done"
-    workdir: "/tmp"
-    enabled: true
-    port: 8081
-    # ready_check_model: port
-    # ===> 为这个进程注入环境变量
-    environment:
-      API_KEY: "your-secret-key"
-      GIN_MODE: "release"
-
-  # 示例: 一个持续输出标准日志的服务
-  - name: log-emitter
-    group: testing
-    command: 'while true; do echo "INFO: Heartbeat signal from log-emitter at $(date)"; sleep 2; done | awk ''{ print; fflush() }'''
-    workdir: "/tmp"
-    enabled: true
-
-  # 示例: 一个持续输出错误日志的服务
-  - name: error-emitter
-    group: testing
-    command: 'while true; do echo "ERROR: A simulated critical failure occurred at $(date)"; sleep 5; done > >(awk ''{ print > "/dev/stderr"; fflush() }'') 2>&1'
-    workdir: "/tmp"
-    enabled: true
-
-  # 示例: 一个被禁用的进程
-  # enabled: false 意味着 procmate 在执行任何操作时都会忽略这个进程。
-  # 这对于我们测试程序的筛选逻辑很有帮助。
-  - name: disabled-process
-    group: examples
-    command: "sleep 3600"
-    workdir: "/tmp"
-    enabled: false
+# 组件列表
+processes: []

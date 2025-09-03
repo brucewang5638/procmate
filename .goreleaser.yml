@@ -46,7 +46,8 @@ archives:
     files:
       - config.yaml
       - procmate.d/.gitkeep
-      - release-scripts/
+      - install.sh
+      - procmate.service
       - README.md
 
 # 生成校验和文件

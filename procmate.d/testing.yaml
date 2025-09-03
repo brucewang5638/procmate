@@ -1,0 +1,13 @@
+# procmate.d/testing.yaml
+processes:
+  - name: log-emitter
+    group: testing
+    command: 'while true; do echo "INFO: Heartbeat signal from log-emitter at $(date)"; sleep 2; done | awk ''{ print; fflush() }'''
+    workdir: "/tmp"
+    enabled: true
+
+  - name: error-emitter
+    group: testing
+    command: 'while true; do echo "ERROR: A simulated critical failure occurred at $(date)"; sleep 5; done > >(awk ''{ print > "/dev/stderr"; fflush() }'') 2>&1'
+    workdir: "/tmp"
+    enabled: true

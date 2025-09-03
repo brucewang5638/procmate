@@ -19,7 +19,7 @@ settings:
     compress: true # 是否压缩/归档旧日志文件
     localTime: true # 使用本地时间创建时间戳
 
-include: "procmate.d/*.yaml"
+include: "conf.d/*.yaml"
 
 # 组件列表
 processes: []

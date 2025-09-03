@@ -1,4 +1,4 @@
-# procmate.d/testing.yaml
+# conf.d/testing.yaml
 processes:
   - name: log-emitter
     group: testing

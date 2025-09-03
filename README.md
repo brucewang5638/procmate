@@ -70,14 +70,14 @@ settings:
     localTime: true
 
 # 指向服务定义文件所在的目录
-include: "procmate.d/*.yaml"
+include: "conf.d/*.yaml"
 ```
 
-### 2. 服务定义目录: `procmate.d/`
+### 2. 服务定义目录: `conf.d/`
 
 该目录下的每一个 `.yaml` 文件都用于定义一组相关的进程。这种方式使得添加、删除和管理单个服务变得非常模块化和清晰。
 
-**示例 `/etc/procmate/procmate.d/web_services.yaml`:**
+**示例 `/etc/procmate/conf.d/web_services.yaml`:**
 
 ```yaml
 # 定义一组 Web 相关的服务

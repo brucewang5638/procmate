@@ -38,12 +38,12 @@ echo "正在复制配置文件..."
 sudo mkdir -p "${PROCMATE_ETC_DIR}"
 sudo cp "${PROCMATE_CONFIG_PATH}" "${PROCMATE_ETC_DIR}/"
 echo "✅ 默认主配置文件已创建于 ${PROCMATE_ETC_DIR}/"
-# 确保 procmate.d 目录存在
-if [ ! -d "${PROCMATE_ETC_DIR}/procmate.d" ]; then
-    sudo mkdir -p "${PROCMATE_ETC_DIR}/procmate.d"
-    echo "✅ 默认子配置文件目录已创建于 ${PROCMATE_ETC_DIR}/procmate.d"
+# 确保 conf.d 目录存在
+if [ ! -d "${PROCMATE_ETC_DIR}/conf.d" ]; then
+    sudo mkdir -p "${PROCMATE_ETC_DIR}/conf.d"
+    echo "✅ 默认子配置文件目录已创建于 ${PROCMATE_ETC_DIR}/conf.d"
 else
-    echo "ℹ️ 已存在 ${PROCMATE_ETC_DIR}/procmate.d，跳过创建。"
+    echo "ℹ️ 已存在 ${PROCMATE_ETC_DIR}/conf.d，跳过创建。"
 fi
 echo ""
 

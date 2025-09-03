@@ -1,4 +1,4 @@
-# procmate.d/services.yaml
+# conf.d/services.yaml
 processes:
   - name: web-server-1
     group: web

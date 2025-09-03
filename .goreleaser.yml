@@ -45,9 +45,7 @@ archives:
     # 将额外的文件包含进最终的压缩包中
     files:
       - config.yaml
-      - procmate.d/.gitkeep
       - install.sh
-      - procmate.service
       - README.md
 
 # 生成校验和文件

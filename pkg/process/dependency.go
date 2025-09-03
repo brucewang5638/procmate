@@ -92,7 +92,7 @@ func topologicalSort(allProcesses map[string]config.Process, planSet map[string]
 			queue = append(queue, name)
 		}
 	}
-	// 对确定性输出的初始队列进行排序，尤其是同一级别的服务。
+	// 对初始队列（无依赖的服务）进行排序，以保证一个可预测的、确定的启动顺序。
 	sort.Strings(queue)
 
 	sorted := []string{}
@@ -101,16 +101,13 @@ func topologicalSort(allProcesses map[string]config.Process, planSet map[string]
 		queue = queue[1:]
 		sorted = append(sorted, current)
 
+		// 服务在依赖满足后以更自然的顺序入队。
 		dependents := graph[current]
-		// 对确定性输出的依赖项进行排序
-		sort.Strings(dependents)
 
 		for _, dependent := range dependents {
 			inDegree[dependent]--
 			if inDegree[dependent] == 0 {
 				queue = append(queue, dependent)
-				// 每次添加新元素时对队列进行排序以保持确定性
-				sort.Strings(queue)
 			}
 		}
 	}

@@ -2,13 +2,10 @@ package process
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"procmate/pkg/config" // 引入 config 包以访问全局配置
 	"strconv"
-	"strings"
-	"time"
 )
 
 // ensureCommonRuntimeDir 确保运行时目录存在，并返回其路径。
@@ -46,38 +43,7 @@ func getPidFile(proc config.Process) (string, error) {
 	return filepath.Join(pidDir, fmt.Sprintf("%s.pid", proc.Name)), nil
 }
 
-// FindMostRecentLogFile 查找目录中最新的日志文件
-func FindMostRecentLogFile(logDir string) (string, error) {
-	var mostRecentFile string
-	var mostRecentTime time.Time
-
-	err := filepath.WalkDir(logDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !d.IsDir() && strings.HasSuffix(d.Name(), ".log") {
-			// 从文件名解析日期
-			dateStr := strings.TrimSuffix(d.Name(), ".log")
-			t, err := time.Parse("2006-01-02", dateStr)
-			if err == nil {
-				if mostRecentFile == "" || t.After(mostRecentTime) {
-					mostRecentTime = t
-					mostRecentFile = path
-				}
-			}
-		}
-		return nil
-	})
-
-	if err != nil {
-		return "", err
-	}
-
-	return mostRecentFile, nil
-}
-
 // GetLogFile 返回指定进程的日志文件路径。
-// 它会尝试寻找最新的日志文件，如果找不到，则返回当天的日志路径。
 func GetLogFile(proc config.Process) (string, error) {
 	// 默认放在 runtime_dir 下
 	runtimeDir, err := ensureCommonRuntimeDir()
@@ -93,21 +59,7 @@ func GetLogFile(proc config.Process) (string, error) {
 		return "", fmt.Errorf("failed to create log directory '%s': %w", logDir, err)
 	}
 
-	// 查找最新的日志文件
-	mostRecentLog, err := FindMostRecentLogFile(logDir)
-	if err != nil {
-		// 如果查找过程中出错，打印一个警告，然后继续使用当天的日志
-		// log.Printf("查找最新日志文件时出错: %v", err)
-	}
-
-	if mostRecentLog != "" {
-		return mostRecentLog, nil
-	}
-
-	// 如果没有找到任何日志文件，则返回当天的日志文件路径
-	today := time.Now().Format("2006-01-02")
-	logFileName := fmt.Sprintf("%s.log", today)
-	return filepath.Join(logDir, logFileName), nil
+	return filepath.Join(logDir, fmt.Sprintf("%s.pid", proc.Name)), nil
 }
 
 // SavePid 保存进程 PID 到对应的 .pid 文件。

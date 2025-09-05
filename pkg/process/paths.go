@@ -59,7 +59,7 @@ func GetLogFile(proc config.Process) (string, error) {
 		return "", fmt.Errorf("failed to create log directory '%s': %w", logDir, err)
 	}
 
-	return filepath.Join(logDir, fmt.Sprintf("%s.pid", proc.Name)), nil
+	return filepath.Join(logDir, fmt.Sprintf("%s.log", proc.Name)), nil
 }
 
 // SavePid 保存进程 PID 到对应的 .pid 文件。

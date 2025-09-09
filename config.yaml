@@ -1,18 +1,19 @@
-# procmate 进程伴侣配置文件
+# procmate 进程伴侣主配置文件
+# 该文件用于定义和管理所有需要被监控和管理的组件与服务。
 
 # 基础配置
 settings:
   # 运行时文件的根目录 (用于存放 pid 和 logs)
-  runtime_dir: /var/log/hk/smzjg-new
+  runtime_dir: /var/procmate
   # 默认的启动超时时间 (秒)
   default_start_timeout_sec: 120
   # 默认的停止超时时间 (秒)
-  default_stop_timeout_sec: 30
+  default_stop_timeout_sec: 10
   # 'watch' 命令的轮询周期 (秒)
   watch_interval_sec: 30
   # 日志配置
   log_options:
-    max_size_mb: 10240 # 在轮转之前，日志文件的最大大小（以MB为单位）
+    max_size_mb: 10000 # 在轮转之前，日志文件的最大大小（以MB为单位）
     max_backups: 10 # 保留的旧日志文件的最大数量
     max_age_days: 30 # 保留旧日志文件的最大天数
     compress: true # 是否压缩/归档旧日志文件

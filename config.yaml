@@ -6,11 +6,11 @@ settings:
   # 运行时文件的根目录 (用于存放 pid 和 logs)
   runtime_dir: /tmp/procmate
   # 默认的启动超时时间 (秒)
-  default_start_timeout_sec: 60
+  default_start_timeout_sec: 120
   # 默认的停止超时时间 (秒)
   default_stop_timeout_sec: 10
   # 'watch' 命令的轮询周期 (秒)
-  watch_interval_sec: 10
+  watch_interval_sec: 30
   # 日志配置
   log_options:
     max_size_mb: 10000 # 在轮转之前，日志文件的最大大小（以MB为单位）

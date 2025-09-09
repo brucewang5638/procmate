@@ -3,7 +3,9 @@ package process
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"procmate/pkg/config"
+	"strings"
 	"sync"
 
 	"github.com/hpcloud/tail"
@@ -58,8 +60,12 @@ func TailLog(proc config.Process) error {
 		go func(t *tail.Tail, filename string) {
 			defer wg.Done()
 			for line := range t.Lines {
-				// 带文件名前缀打印日志行，方便区分来源
-				fmt.Printf("[%s] %s\n", filename, line.Text)
+				prefix := getLogPrefix(filename, len(logFiles) > 1)
+				if prefix != "" {
+					fmt.Printf("[%s] %s\n", prefix, line.Text)
+				} else {
+					fmt.Println(line.Text)
+				}
 			}
 		}(t, logFile)
 	}
@@ -74,4 +80,24 @@ func TailLog(proc config.Process) error {
 	wg.Wait()
 
 	return nil
+}
+
+// getLogPrefix 根据文件路径生成合适的日志前缀
+func getLogPrefix(filename string, multipleFiles bool) string {
+	// 如果只有一个文件，不显示前缀
+	if !multipleFiles {
+		return ""
+	}
+	
+	// 检查是否是procmate管理的日志文件
+	if strings.Contains(filename, "/logs/") && strings.HasSuffix(filename, ".log") {
+		// 对于procmate日志，使用进程名而不是通用的"procmate"标识
+		baseName := filepath.Base(filename)
+		processName := strings.TrimSuffix(baseName, ".log")
+		return "stdout/" + processName // 表示这是进程的stdout/stderr输出
+	}
+	
+	// 对于用户自定义的日志文件，使用完整文件名
+	baseName := filepath.Base(filename)
+	return "file/" + baseName
 }

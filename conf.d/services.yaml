@@ -19,3 +19,5 @@ processes:
     environment:
       API_KEY: "your-secret-key"
       GIN_MODE: "release"
+    log_files:
+      - "/tmp/procmate/api-server-1.log"

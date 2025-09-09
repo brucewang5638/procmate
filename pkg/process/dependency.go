@@ -47,6 +47,10 @@ func buildPlanSet(allProcesses map[string]config.Process, requested []string) (m
 			return fmt.Errorf("service '%s' is not defined in config.yaml", name)
 		}
 
+		if !process.Enabled {
+			return nil
+		}
+
 		plan[name] = true
 		for _, depName := range process.DependsOn {
 			if err := visit(depName); err != nil {

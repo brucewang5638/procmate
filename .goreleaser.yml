@@ -47,7 +47,7 @@ archives:
       - config.yaml
       - conf.d
       - install.sh
-      - README.md
+      - README.pdf
 
 # 生成校验和文件
 checksum:

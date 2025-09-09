@@ -42,6 +42,9 @@ type Process struct {
 
 	// 依赖关系 (字符串切片)
 	DependsOn []string `mapstructure:"depends_on"`
+
+	// 额外的日志文件路径 (用于Java应用等使用日志框架的情况)
+	LogFiles []string `mapstructure:"log_files"`
 }
 
 // LogOptions 结构体对应 'log_options' 部分，用于配置日志轮转。

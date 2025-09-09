@@ -126,6 +126,7 @@ ExecStart=${PROCMATE_BIN_LINK} watch
 Restart=on-failure
 RestartSec=5s
 User=root
+LimitNOFILE=150000
 
 [Install]
 WantedBy=multi-user.target

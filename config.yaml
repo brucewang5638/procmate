@@ -1,208 +1,25 @@
-# procmate 进程伴侣配置文件
+# procmate 进程伴侣主配置文件
+# 该文件用于定义和管理所有需要被监控和管理的组件与服务。
 
 # 基础配置
 settings:
   # 运行时文件的根目录 (用于存放 pid 和 logs)
-  runtime_dir: /var/log/hk/smzjg-new
+  runtime_dir: /var/procmate
   # 默认的启动超时时间 (秒)
-  default_start_timeout_sec: 90
+  default_start_timeout_sec: 120
   # 默认的停止超时时间 (秒)
-  default_stop_timeout_sec: 30
+  default_stop_timeout_sec: 10
   # 'watch' 命令的轮询周期 (秒)
   watch_interval_sec: 30
   # 日志配置
   log_options:
-    max_size_mb: 10240 # 在轮转之前，日志文件的最大大小（以MB为单位）
+    max_size_mb: 10000 # 在轮转之前，日志文件的最大大小（以MB为单位）
     max_backups: 10 # 保留的旧日志文件的最大数量
     max_age_days: 30 # 保留旧日志文件的最大天数
     compress: true # 是否压缩/归档旧日志文件
     localTime: true # 使用本地时间创建时间戳
 
-# 进程列表
-processes:
-  # --- 原 Components 列表 ---
-  - name: nginx
-    port: 19704
-    enabled: true
-    command: "/opt/hk/component/hknginx1/nginx -p /opt/hk/component/hknginx1 -c /opt/hk/component/hknginx1/nginx.conf -g 'daemon off;'"
-    workdir: "/opt/hk/component/hknginx1"
+include: "conf.d/*.yaml"
 
-  - name: redis
-    port: 19703
-    enabled: true
-    command: "/opt/hk/component/redis/bin/redis-server /opt/hk/component/redis/bin/redis.conf"
-    workdir: "/opt/hk/component/redis/bin"
-
-  - name: elasticsearch
-    port: 19702
-    enabled: true
-    command: "/opt/hk/component/elasticsearch-7.6.2/bin/elasticsearch"
-    workdir: "/opt/hk/component/elasticsearch-7.6.2"
-
-  - name: nacos
-    port: 18848
-    enabled: true
-    command: "sh /opt/hk/component/nacos/bin/startup.sh -m standalone"
-    workdir: "/opt/hk/component/nacos/bin"
-
-  - name: zookeeper
-    port: 12181
-    enabled: true
-    command: "/opt/hk/component/kafka/bin/zookeeper-server-start.sh /opt/hk/component/kafka/config/zookeeper.properties"
-    workdir: "/opt/hk/component/kafka"
-
-  - name: kafka
-    port: 19701
-    enabled: true
-    command: "/opt/hk/component/kafka/bin/kafka-server-start.sh /opt/hk/component/kafka/config/server.properties"
-    workdir: "/opt/hk/component/kafka"
-
-  - name: mariadb
-    port: 3306
-    enabled: false
-    command: "systemctl start mariadb.service"
-    workdir: "/"
-
-  # --- 原 Services 列表 ---
-  - name: smzjg-framework
-    port: 19700
-    enabled: true
-    command: "java -Xmx1024m -jar /opt/hk/hkservice/framework/bus/bin/hkinfo-system.jar"
-    workdir: "/opt/hk/hkservice/framework/bus/bin"
-    depends_on:
-      - mariadb
-      - redis
-      - elasticsearch
-      - zookeeper
-      - kafka
-      - nacos
-
-  - name: smzjg-assets
-    port: 19715
-    enabled: true
-    command: "java -Xmx256m -jar /opt/hk/hkservice/assets/bus/bin/hkinfo-asset.jar"
-    workdir: "/opt/hk/hkservice/assets/bus/bin"
-    depends_on:
-      - mariadb
-      - redis
-      - elasticsearch
-      - zookeeper
-      - kafka
-      - nacos
-
-  - name: smzjg-dispose
-    port: 19712
-    enabled: true
-    command: "java -Xmx512m -jar /opt/hk/hkservice/dispose/bus/bin/hkinfo-dispose.jar"
-    workdir: "/opt/hk/hkservice/dispose/bus/bin"
-    depends_on:
-      - mariadb
-      - redis
-      - elasticsearch
-      - zookeeper
-      - kafka
-      - nacos
-
-  - name: smzjg-icpconsole
-    port: 19710
-    enabled: true
-    command: "java -Xmx512m -jar /opt/hk/hkservice/icp/bus/bin/icp-console.jar"
-    workdir: "/opt/hk/hkservice/icp/bus/bin"
-    depends_on:
-      - mariadb
-      - redis
-      - elasticsearch
-      - zookeeper
-      - kafka
-      - nacos
-
-  - name: smzjg-milkyway-console
-    port: 19705
-    enabled: true
-    command: "java -Xmx512m -jar /opt/hk/hkservice/milkyway/bus/console/bin/milkyway.jar"
-    workdir: "/opt/hk/hkservice/milkyway/bus/console/bin"
-    depends_on:
-      - mariadb
-      - redis
-      - elasticsearch
-      - zookeeper
-      - kafka
-      - nacos
-
-  - name: smzjg-milkyway-service
-    port: 19707
-    enabled: true
-    command: "java -Xmx512m -jar /opt/hk/hkservice/milkyway/bus/service/bin/datasource.jar"
-    workdir: "/opt/hk/hkservice/milkyway/bus/service/bin"
-    depends_on:
-      - mariadb
-      - redis
-      - elasticsearch
-      - zookeeper
-      - kafka
-      - nacos
-
-  - name: smzjg-report
-    port: 19730
-    enabled: true
-    command: "java -Xmx512m -jar /opt/hk/hkservice/report/bus/bin/hkinfo-zjg-report.jar"
-    workdir: "/opt/hk/hkservice/report/bus/bin"
-    depends_on:
-      - mariadb
-      - redis
-      - elasticsearch
-      - zookeeper
-      - kafka
-      - nacos
-
-  - name: smzjg-order
-    port: 19723
-    enabled: true
-    command: "java -Xmx512m -jar /opt/hk/hkservice/order_tzb/bus/bin/hkinfo-order.jar"
-    workdir: "/opt/hk/hkservice/order_tzb/bus/bin"
-    depends_on:
-      - mariadb
-      - redis
-      - elasticsearch
-      - zookeeper
-      - kafka
-      - nacos
-
-  - name: smzjg-smjcq-api
-    port: 19762
-    enabled: true
-    command: "java -Xmx512m -jar /opt/hk/hkservice/smjcq/api/bus/bin/hkinfo-smjcq-api.jar"
-    workdir: "/opt/hk/hkservice/smjcq/api/bus/bin"
-    depends_on:
-      - mariadb
-      - redis
-      - elasticsearch
-      - zookeeper
-      - kafka
-      - nacos
-
-  - name: smzjg-smjcq-manage
-    port: 19760
-    enabled: true
-    command: "java -Xmx512m -jar /opt/hk/hkservice/smjcq/manage/bus/bin/hkinfo-smjcq-manage.jar"
-    workdir: "/opt/hk/hkservice/smjcq/manage/bus/bin"
-    depends_on:
-      - mariadb
-      - redis
-      - elasticsearch
-      - zookeeper
-      - kafka
-      - nacos
-
-  - name: smzjg-screen
-    port: 19713
-    enabled: true
-    command: "java -Xmx512m -jar /opt/hk/hkservice/screen/bus/bin/screen.jar"
-    workdir: "/opt/hk/hkservice/screen/bus/bin"
-    depends_on:
-      - mariadb
-      - redis
-      - elasticsearch
-      - zookeeper
-      - kafka
-      - nacos
+# 组件列表
+processes: []

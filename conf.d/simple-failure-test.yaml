@@ -1,0 +1,58 @@
+# 简单的智能失败处理测试配置
+# 演示当某个进程失败时，只有依赖它的进程会被跳过，独立进程继续执行
+
+processes:
+  # 第一层：基础服务（无依赖）
+  - name: db-service
+    group: infrastructure
+    command: 'echo "数据库启动成功"; sleep 1'
+    workdir: "/tmp"
+    enabled: false
+
+  - name: will-fail
+    group: infrastructure  
+    command: 'echo "这个服务会失败"; sleep 0.5; echo "启动失败"; exit 1'
+    workdir: "/tmp"
+    enabled: false
+
+  - name: standalone-service
+    group: infrastructure
+    command: 'echo "独立服务启动成功"; sleep 1'
+    workdir: "/tmp"
+    enabled: false
+
+  # 第二层：依赖第一层服务
+  - name: app-server
+    group: application
+    command: 'echo "应用服务器启动成功"; sleep 1'
+    workdir: "/tmp"
+    enabled: false
+    depends_on: ["db-service"]
+
+  - name: depends-on-failing
+    group: application
+    command: 'echo "依赖失败服务的应用启动成功"; sleep 1'
+    workdir: "/tmp"
+    enabled: false
+    depends_on: ["will-fail"]
+
+  - name: another-standalone
+    group: application
+    command: 'echo "另一个独立服务启动成功"; sleep 1'
+    workdir: "/tmp"
+    enabled: false
+
+  # 第三层：依赖第二层服务
+  - name: gateway
+    group: gateway
+    command: 'echo "网关启动成功"; sleep 1'
+    workdir: "/tmp"
+    enabled: false
+    depends_on: ["app-server"]
+
+  - name: also-depends-on-failing
+    group: gateway
+    command: 'echo "这个也依赖失败服务启动成功"; sleep 1'
+    workdir: "/tmp"
+    enabled: false
+    depends_on: ["depends-on-failing"]

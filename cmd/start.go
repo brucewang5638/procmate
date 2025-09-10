@@ -68,8 +68,8 @@ var startCmd = &cobra.Command{
 		}
 		fmt.Println("---")
 
-		// 6. 使用并行启动管理器执行启动
-		manager := process.NewParallelStartManager(process.GetDefaultParallelStartOptions())
+		// 6. 使用智能失败处理的并行启动管理器执行启动
+		manager := process.NewParallelStartManager(process.GetSmartParallelStartOptions())
 		ctx := context.Background()
 		
 		layerResults, err := manager.StartProcessesInLayers(executionLayers, ctx)

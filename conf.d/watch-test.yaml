@@ -1,0 +1,30 @@
+# Watch并行重启测试配置
+
+processes:
+  # 基础服务
+  - name: service-a
+    group: base
+    command: 'echo "Service A started successfully"; while true; do sleep 5; done'
+    workdir: "/tmp"
+    enabled: true
+
+  - name: service-b  
+    group: base
+    command: 'echo "Service B started successfully"; while true; do sleep 5; done'
+    workdir: "/tmp"
+    enabled: true
+
+  # 依赖基础服务的服务
+  - name: service-c
+    group: app
+    command: 'echo "Service C started successfully"; while true; do sleep 5; done'
+    workdir: "/tmp"
+    enabled: true
+    depends_on: ["service-a"]
+
+  - name: service-d
+    group: app
+    command: 'echo "Service D started successfully"; while true; do sleep 5; done'
+    workdir: "/tmp"
+    enabled: true
+    depends_on: ["service-b"]

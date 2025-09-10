@@ -35,12 +35,13 @@ type LayerResult struct {
 // ParallelStartManager 并行启动管理器
 // 负责管理进程的并行启动，包括依赖关系处理、错误管理、超时控制等
 type ParallelStartManager struct {
-	maxConcurrency    int           // 最大并发数，0表示无限制
-	layerTimeout      time.Duration // 单层启动超时时间
-	processTimeout    time.Duration // 单个进程启动超时时间
-	stopOnFirstError  bool          // 是否在首个错误时停止启动
-	enableRollback    bool          // 是否启用失败回滚
-	showProgress      bool          // 是否显示进度信息
+	maxConcurrency       int           // 最大并发数，0表示无限制
+	layerTimeout         time.Duration // 单层启动超时时间
+	processTimeout       time.Duration // 单个进程启动超时时间
+	stopOnFirstError     bool          // 是否在首个错误时停止启动
+	enableRollback       bool          // 是否启用失败回滚
+	showProgress         bool          // 是否显示进度信息
+	smartFailureHandling bool          // 是否启用智能失败处理
 }
 
 // ParallelStartOptions 并行启动配置选项
@@ -51,6 +52,7 @@ type ParallelStartOptions struct {
 	StopOnFirstError bool          // 遇到第一个错误时是否停止
 	EnableRollback   bool          // 是否在失败时回滚已启动的进程
 	ShowProgress     bool          // 是否显示启动进度
+	SmartFailureHandling bool      // 是否启用智能失败处理（仅停止依赖失败进程的进程）
 }
 
 // NewParallelStartManager 创建新的并行启动管理器
@@ -78,12 +80,13 @@ func NewParallelStartManager(options ParallelStartOptions) *ParallelStartManager
 	}
 
 	return &ParallelStartManager{
-		maxConcurrency:   options.MaxConcurrency,
-		layerTimeout:     options.LayerTimeout,
-		processTimeout:   options.ProcessTimeout,
-		stopOnFirstError: options.StopOnFirstError,
-		enableRollback:   options.EnableRollback,
-		showProgress:     options.ShowProgress,
+		maxConcurrency:       options.MaxConcurrency,
+		layerTimeout:         options.LayerTimeout,
+		processTimeout:       options.ProcessTimeout,
+		stopOnFirstError:     options.StopOnFirstError,
+		enableRollback:       options.EnableRollback,
+		showProgress:         options.ShowProgress,
+		smartFailureHandling: options.SmartFailureHandling,
 	}
 }
 
@@ -103,6 +106,7 @@ func NewParallelStartManager(options ParallelStartOptions) *ParallelStartManager
 //   2. 同层内进程并行启动
 //   3. 等待每层完成后再进入下一层
 //   4. 根据配置决定是否在失败时停止或回滚
+//   5. 支持智能失败处理，仅跳过依赖失败进程的进程
 //
 // 示例:
 //   ctx := context.Background()
@@ -113,9 +117,13 @@ func NewParallelStartManager(options ParallelStartOptions) *ParallelStartManager
 func (m *ParallelStartManager) StartProcessesInLayers(layers [][]config.Process, ctx context.Context) ([]LayerResult, error) {
 	var allResults []LayerResult
 	var startedProcesses []config.Process // 用于失败时的回滚
+	failedProcesses := make(map[string]bool) // 跟踪失败的进程
 
 	if m.showProgress {
 		fmt.Printf("🚀 开始分层并行启动，共 %d 层\n", len(layers))
+		if m.smartFailureHandling {
+			fmt.Println("🧠 启用智能失败处理：仅依赖失败进程的进程会被跳过")
+		}
 	}
 
 	// 逐层处理
@@ -124,25 +132,66 @@ func (m *ParallelStartManager) StartProcessesInLayers(layers [][]config.Process,
 			fmt.Printf("\n📋 启动第 %d/%d 层，包含 %d 个进程...\n", layerIndex+1, len(layers), len(layer))
 		}
 
+		// 如果启用智能失败处理，过滤出需要启动的进程
+		var processesToStart []config.Process
+		var skippedDueToFailedDeps []config.Process
+
+		if m.smartFailureHandling && len(failedProcesses) > 0 {
+			for _, process := range layer {
+				shouldSkip := false
+				for _, dep := range process.DependsOn {
+					if failedProcesses[dep] {
+						shouldSkip = true
+						break
+					}
+				}
+				if shouldSkip {
+					skippedDueToFailedDeps = append(skippedDueToFailedDeps, process)
+				} else {
+					processesToStart = append(processesToStart, process)
+				}
+			}
+		} else {
+			processesToStart = layer
+		}
+
 		// 创建该层的上下文，设置超时
 		layerCtx, cancel := context.WithTimeout(ctx, m.layerTimeout)
 		
-		// 启动当前层的所有进程
-		layerResult := m.startLayer(layerCtx, layerIndex, layer)
+		// 启动当前层的进程
+		layerResult := m.startLayer(layerCtx, layerIndex, processesToStart)
 		cancel() // 确保释放上下文资源
+
+		// 为被跳过的依赖失败进程添加跳过结果
+		for _, process := range skippedDueToFailedDeps {
+			layerResult.Results = append(layerResult.Results, StartupResult{
+				Process:   process,
+				Success:   false,
+				IsSkipped: true,
+				Error:     fmt.Errorf("跳过：依赖的进程启动失败"),
+			})
+			layerResult.SkippedCount++
+			
+			if m.showProgress {
+				fmt.Printf("🟡 跳过进程 %s：依赖的进程启动失败\n", process.Name)
+			}
+		}
 		
 		allResults = append(allResults, layerResult)
 
 		// 记录成功启动的进程，用于可能的回滚
+		// 同时记录失败的进程用于后续依赖分析
 		for _, result := range layerResult.Results {
 			if result.Success && !result.IsSkipped {
 				startedProcesses = append(startedProcesses, result.Process)
+			} else if !result.Success && !result.IsSkipped {
+				failedProcesses[result.Process.Name] = true
 			}
 		}
 
 		// 检查是否需要因为错误而停止
 		if layerResult.HasFailures {
-			if m.stopOnFirstError {
+			if m.stopOnFirstError && !m.smartFailureHandling {
 				if m.showProgress {
 					fmt.Printf("❌ 第 %d 层存在启动失败，停止后续启动\n", layerIndex+1)
 				}
@@ -160,7 +209,11 @@ func (m *ParallelStartManager) StartProcessesInLayers(layers [][]config.Process,
 				return allResults, fmt.Errorf("第 %d 层存在 %d 个进程启动失败", layerIndex+1, layerResult.FailureCount)
 			} else {
 				if m.showProgress {
-					fmt.Printf("⚠️  第 %d 层存在 %d 个失败，但继续启动后续层\n", layerIndex+1, layerResult.FailureCount)
+					if m.smartFailureHandling {
+						fmt.Printf("⚠️  第 %d 层存在 %d 个失败，继续启动后续层（智能跳过相关依赖）\n", layerIndex+1, layerResult.FailureCount)
+					} else {
+						fmt.Printf("⚠️  第 %d 层存在 %d 个失败，但继续启动后续层\n", layerIndex+1, layerResult.FailureCount)
+					}
 				}
 			}
 		}
@@ -377,12 +430,13 @@ func (m *ParallelStartManager) rollbackStartedProcesses(processes []config.Proce
 //   - ParallelStartOptions: 默认的并行启动配置
 func GetDefaultParallelStartOptions() ParallelStartOptions {
 	return ParallelStartOptions{
-		MaxConcurrency:   0,                  // 无并发限制
-		LayerTimeout:     10 * time.Minute,   // 10分钟层超时
-		ProcessTimeout:   2 * time.Minute,    // 2分钟进程超时
-		StopOnFirstError: true,               // 遇错停止
-		EnableRollback:   true,               // 启用回滚
-		ShowProgress:     true,               // 显示进度
+		MaxConcurrency:       0,                  // 无并发限制
+		LayerTimeout:         10 * time.Minute,   // 10分钟层超时
+		ProcessTimeout:       2 * time.Minute,    // 2分钟进程超时
+		StopOnFirstError:     true,               // 遇错停止
+		EnableRollback:       true,               // 启用回滚
+		ShowProgress:         true,               // 显示进度
+		SmartFailureHandling: false,              // 默认不启用智能失败处理
 	}
 }
 
@@ -393,12 +447,13 @@ func GetDefaultParallelStartOptions() ParallelStartOptions {
 //   - ParallelStartOptions: 保守的并行启动配置
 func GetConservativeParallelStartOptions() ParallelStartOptions {
 	return ParallelStartOptions{
-		MaxConcurrency:   3,                  // 限制并发数
-		LayerTimeout:     15 * time.Minute,   // 更长的层超时
-		ProcessTimeout:   5 * time.Minute,    // 更长的进程超时
-		StopOnFirstError: true,               // 遇错停止
-		EnableRollback:   true,               // 启用回滚
-		ShowProgress:     true,               // 显示进度
+		MaxConcurrency:       3,                  // 限制并发数
+		LayerTimeout:         15 * time.Minute,   // 更长的层超时
+		ProcessTimeout:       5 * time.Minute,    // 更长的进程超时
+		StopOnFirstError:     true,               // 遇错停止
+		EnableRollback:       true,               // 启用回滚
+		ShowProgress:         true,               // 显示进度
+		SmartFailureHandling: false,              // 保守模式不启用智能失败处理
 	}
 }
 
@@ -409,11 +464,29 @@ func GetConservativeParallelStartOptions() ParallelStartOptions {
 //   - ParallelStartOptions: 激进的并行启动配置
 func GetAggressiveParallelStartOptions() ParallelStartOptions {
 	return ParallelStartOptions{
-		MaxConcurrency:   0,                  // 无并发限制
-		LayerTimeout:     5 * time.Minute,    // 较短的层超时
-		ProcessTimeout:   30 * time.Second,   // 较短的进程超时
-		StopOnFirstError: false,              // 不因错误停止
-		EnableRollback:   false,              // 不启用回滚
-		ShowProgress:     true,               // 显示进度
+		MaxConcurrency:       0,                  // 无并发限制
+		LayerTimeout:         5 * time.Minute,    // 较短的层超时
+		ProcessTimeout:       30 * time.Second,   // 较短的进程超时
+		StopOnFirstError:     false,              // 不因错误停止
+		EnableRollback:       false,              // 不启用回滚
+		ShowProgress:         true,               // 显示进度
+		SmartFailureHandling: true,               // 激进模式启用智能失败处理
+	}
+}
+
+// GetSmartParallelStartOptions 获取智能失败处理的并行启动配置
+// 专门优化的配置，在失败时只跳过相关依赖进程，独立进程继续执行
+//
+// 返回:
+//   - ParallelStartOptions: 智能失败处理的并行启动配置
+func GetSmartParallelStartOptions() ParallelStartOptions {
+	return ParallelStartOptions{
+		MaxConcurrency:       0,                  // 无并发限制
+		LayerTimeout:         10 * time.Minute,   // 10分钟层超时
+		ProcessTimeout:       2 * time.Minute,    // 2分钟进程超时
+		StopOnFirstError:     false,              // 不因错误停止全部
+		EnableRollback:       false,              // 不回滚独立的成功进程
+		ShowProgress:         true,               // 显示进度
+		SmartFailureHandling: true,               // 启用智能失败处理
 	}
 }

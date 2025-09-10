@@ -6,25 +6,25 @@ processes:
     group: base
     command: 'echo "Service A started successfully"; while true; do sleep 5; done'
     workdir: "/tmp"
-    enabled: true
+    enabled: false
 
   - name: service-b  
     group: base
     command: 'echo "Service B started successfully"; while true; do sleep 5; done'
     workdir: "/tmp"
-    enabled: true
+    enabled: false
 
   # 依赖基础服务的服务
   - name: service-c
     group: app
     command: 'echo "Service C started successfully"; while true; do sleep 5; done'
     workdir: "/tmp"
-    enabled: true
+    enabled: false
     depends_on: ["service-a"]
 
   - name: service-d
     group: app
     command: 'echo "Service D started successfully"; while true; do sleep 5; done'
     workdir: "/tmp"
-    enabled: true
+    enabled: false
     depends_on: ["service-b"]

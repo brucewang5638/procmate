@@ -101,7 +101,76 @@ var startCmd = &cobra.Command{
 		
 		// 8. 根据结果决定命令执行状态
 		if totalFailure > 0 {
-			return fmt.Errorf("有 %d 个进程启动失败", totalFailure)
+			// 收集启动失败的进程和成功启动的进程
+			var failedProcesses []config.Process
+			var successfulProcesses []config.Process
+			
+			for _, layerResult := range layerResults {
+				for _, result := range layerResult.Results {
+					if !result.Success && !result.IsSkipped {
+						failedProcesses = append(failedProcesses, result.Process)
+					} else if result.Success && !result.IsSkipped {
+						successfulProcesses = append(successfulProcesses, result.Process)
+					}
+				}
+			}
+
+			// 自动清理启动失败的进程
+			if len(failedProcesses) > 0 {
+				fmt.Printf("\n🧹 发现 %d 个启动失败的进程，正在自动清理...\n", len(failedProcesses))
+				
+				fmt.Printf("📋 清理计划：将清理 %d 个启动失败的进程\n", len(failedProcesses))
+				for _, proc := range failedProcesses {
+					fmt.Printf("　- %s\n", proc.Name)
+				}
+				
+				// 对于失败清理，我们不需要复杂的依赖分析
+				// 直接并行清理所有失败的进程即可
+				cleanupSuccess := 0
+				cleanupSkipped := 0
+				cleanupFailed := 0
+				
+				// 使用并发清理失败的进程
+				for _, proc := range failedProcesses {
+					// 检查进程是否还在运行
+					isRunning, err := process.IsRunning(proc)
+					if err != nil || !isRunning {
+						cleanupSkipped++
+						continue
+					}
+					
+					// 停止进程
+					if err := process.Stop(proc); err != nil {
+						fmt.Printf("⚠️ 清理进程 %s 失败: %v\n", proc.Name, err)
+						cleanupFailed++
+					} else {
+						cleanupSuccess++
+					}
+				}
+				
+				if cleanupFailed > 0 {
+					fmt.Printf("🧹 清理完成：成功 %d 个，失败 %d 个，跳过 %d 个（未运行）\n", 
+						cleanupSuccess, cleanupFailed, cleanupSkipped)
+				} else {
+					fmt.Printf("🧹 清理完成：成功清理 %d 个进程，跳过 %d 个进程（未运行）\n", 
+						cleanupSuccess, cleanupSkipped)
+				}
+			}
+
+			// 如果有成功启动的进程，询问用户是否要回滚
+			if len(successfulProcesses) > 0 {
+				fmt.Printf("\n💡 提示：有 %d 个进程启动成功，如需全部回滚，请运行：\n", len(successfulProcesses))
+				fmt.Print("   ./procmate stop ")
+				for i, proc := range successfulProcesses {
+					if i > 0 {
+						fmt.Print(" ")
+					}
+					fmt.Print(proc.Name)
+				}
+				fmt.Println()
+			}
+
+			return fmt.Errorf("启动过程中有 %d 个进程失败", totalFailure)
 		}
 
 		return nil

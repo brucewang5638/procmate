@@ -1,0 +1,38 @@
+# 失败清理测试配置
+
+processes:
+  # 正常启动的进程
+  - name: good-service-1
+    group: base
+    command: 'echo "Good service 1 started successfully"; while true; do sleep 5; done'
+    workdir: "/tmp"
+    enabled: true
+
+  - name: good-service-2  
+    group: base
+    command: 'echo "Good service 2 started successfully"; while true; do sleep 5; done'
+    workdir: "/tmp"
+    enabled: true
+
+  # 故意失败的进程
+  - name: failing-service-1
+    group: app
+    command: 'echo "Failing service 1 will exit"; sleep 1; echo "Process exiting with error"; exit 1'
+    workdir: "/tmp"
+    enabled: true
+    start_timeout_sec: 10
+
+  - name: failing-service-2
+    group: app  
+    command: 'echo "Failing service 2 will timeout"; sleep 20; echo "This should timeout"'
+    workdir: "/tmp"
+    enabled: true
+    start_timeout_sec: 3  # 设置短超时让它超时失败
+
+  # 依赖正常服务的进程
+  - name: dependent-service
+    group: app
+    command: 'echo "Dependent service started successfully"; while true; do sleep 5; done'
+    workdir: "/tmp"
+    enabled: true
+    depends_on: ["good-service-1"]

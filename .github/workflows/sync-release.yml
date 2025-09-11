@@ -1,0 +1,82 @@
+# 工作流的名称，会显示在 GitHub Actions 页面
+name: Sync Release to Customer Branches
+
+on:
+  #    请注意：GitHub Actions 的 cron 使用 UTC 时间，'0 2 * * 5' 对应的是北京时间周五上午 10 点。
+  schedule:
+    - cron: '0 2 * * 5'
+
+  workflow_dispatch:
+
+jobs:
+  sync-branches:
+    name: 'Sync release/1.x -> ${{ matrix.customer_branch }}'
+    runs-on: ubuntu-latest
+
+    # 使用“矩阵策略 (Matrix Strategy)”来为多个客户分支并行或串行执行相同的步骤
+    # 这是处理多个相似任务的最佳实践，无需复制粘贴代码
+    strategy:
+      # 设置为 true 时，一个分支的失败不会取消其他分支的运行
+      fail-fast: false
+      matrix:
+        # 在这里列出你所有的客户分支名称
+        customer_branch:
+          - 'customer/hkinfo-1.x'
+
+    # 任务的具体执行步骤
+    steps:
+      # fetch-depth: 0 表示获取所有的历史记录，这对于合并操作是必需的
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 步骤 2：核心逻辑 - 尝试合并分支并创建 PR
+      - name: Merge release/1.x & Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          # Git 提交者的信息
+          commit-message: 'chore(sync): Merge branch release/1.x'
+          committer: 'GitHub Actions <actions@github.com>'
+          author: 'GitHub Actions <actions@github.com>'
+
+          # PR 的标题
+          title: '🔄 [Auto Sync] Merge `release/1.x` into `${{ matrix.customer_branch }}`'
+          # PR 的内容
+          body: |
+            This is an automated PR to sync the latest changes from the `release/1.x` LTS branch.
+
+            - **Source Branch:** `release/1.x`
+            - **Target Branch:** `${{ matrix.customer_branch }}`
+
+            Please review the changes and merge if everything is correct.
+            If there are merge conflicts, this PR will not be created, and a notification will be sent.
+
+          # 基础分支，即 PR 的目标分支
+          base: ${{ matrix.customer_branch }}
+          # 要合并过来的源分支
+          # 它会创建一个临时分支来存放合并后的代码
+          branch: 'actions/sync-release-to-${{ matrix.customer_branch }}'
+
+          # 如果分支已是最新，则不创建 PR
+          branch-suffix: 'timestamp'
+
+      # 步骤 3：处理合并冲突和失败
+      # 这个步骤只有在前面的步骤（特别是创建 PR 的步骤）失败时才会运行
+      - name: Notify on Merge Conflict
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        with:
+          # 这里使用了 Slack 通知，你也可以换成 Teams、钉钉或邮件
+          # SLACK_WEBHOOK_URL 需要预先在仓库的 Secrets 中配置好
+          status: 'failure'
+          text: 'Merge conflict detected!'
+          title: '❌ Merge Conflict: `release/1.x` -> `${{ matrix.customer_branch }}`'
+          message: |
+            The automated workflow failed to merge the `release/1.x` branch into `${{ matrix.customer_branch }}` due to merge conflicts.
+            Please resolve the conflicts manually.
+            Workflow run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          color: 'danger'
+          # 使用 env 上下文来引用 Secrets
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

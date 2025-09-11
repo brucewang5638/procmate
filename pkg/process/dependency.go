@@ -1,6 +1,7 @@
 package process
 
 import (
+	"container/list"
 	"fmt"
 	"sort"
 	"strings"
@@ -12,20 +13,20 @@ import (
 // 包含进程配置以及其在依赖图中的关系信息
 type ProcessNode struct {
 	Process      config.Process // 进程配置信息
-	Dependencies []string       // 该进程依赖的其他进程名称列表
-	Dependents   []string       // 依赖于该进程的其他进程名称列表
+	Dependencies []*ProcessNode // 该进程依赖的其他进程列表
+	Dependents   []*ProcessNode // 依赖于该进程的其他进程列表
 	Layer        int            // 该进程在分层执行计划中的层级（0为最底层，无依赖）
 }
 
 // DependencyGraph 表示进程依赖关系图
 // 提供依赖分析、循环检测、分层规划等核心功能
 type DependencyGraph struct {
-	nodes map[string]*ProcessNode // 进程名称到节点的映射
-	layers [][]string              // 分层执行计划，每层包含可并行执行的进程名称
+	nodes  map[string]*ProcessNode // 进程名称到节点的映射
+	layers [][]*ProcessNode        // 分层执行计划，每层包含可并行执行的进程名称
 }
 
-// NewDependencyGraph 创建一个新的依赖图实例
-// 
+// buildDependencyGraph 创建一个新的依赖图实例
+//
 // 参数:
 //   - allProcesses: 所有可用进程的映射表，key为进程名称，value为进程配置
 //   - requestedServices: 请求启动的进程名称列表
@@ -35,21 +36,22 @@ type DependencyGraph struct {
 //   - error: 构建过程中遇到的错误（如循环依赖、未定义进程等）
 //
 // 示例:
-//   graph, err := NewDependencyGraph(allProcesses, []string{"web", "db"})
-//   if err != nil {
-//       log.Fatal("构建依赖图失败:", err)
-//   }
-func NewDependencyGraph(allProcesses map[string]config.Process, requestedServices []string) (*DependencyGraph, error) {
+//
+//	graph, err := buildDependencyGraph(allProcesses, []string{"web", "db"})
+//	if err != nil {
+//	    log.Fatal("构建依赖图失败:", err)
+//	}
+func buildDependencyGraph(allProcesses []config.Process, requestedProcesses []config.Process) (*DependencyGraph, error) {
 	graph := &DependencyGraph{
 		nodes: make(map[string]*ProcessNode),
 	}
 
 	// 第一步：构建包含所有必需进程的节点集合
-	if err := graph.buildNodes(allProcesses, requestedServices); err != nil {
+	if err := graph.buildNodes(allProcesses, requestedProcesses); err != nil {
 		return nil, fmt.Errorf("构建依赖图节点失败: %w", err)
 	}
 
-	// 第二步：建立节点间的依赖关系
+	// 第二步：建立节点间的双向关系
 	if err := graph.buildDependencyRelations(); err != nil {
 		return nil, fmt.Errorf("建立依赖关系失败: %w", err)
 	}
@@ -69,51 +71,57 @@ func NewDependencyGraph(allProcesses map[string]config.Process, requestedService
 
 // buildNodes 递归构建依赖图中的所有节点
 // 从请求的服务开始，递归添加所有依赖的进程
-func (g *DependencyGraph) buildNodes(allProcesses map[string]config.Process, services []string) error {
-	// 使用递归函数来处理每个服务及其依赖
-	var addNode func(serviceName string) error
-	addNode = func(serviceName string) error {
-		// 如果节点已存在，跳过处理
-		if _, exists := g.nodes[serviceName]; exists {
-			return nil
+func (g *DependencyGraph) buildNodes(allProcesses []config.Process, requestedProcesses []config.Process) error {
+	enabledProcessesMap := make(map[string]config.Process)
+	for _, p := range allProcesses {
+		if p.Enabled {
+			enabledProcessesMap[p.Name] = p
 		}
-
-		// 检查进程是否在配置中定义
-		process, exists := allProcesses[serviceName]
-		if !exists {
-			return fmt.Errorf("进程 '%s' 未在配置文件中定义", serviceName)
-		}
-
-		// 检查进程是否已启用
-		if !process.Enabled {
-			return fmt.Errorf("进程 '%s' 已被禁用 (enabled: false)", serviceName)
-		}
-
-		// 创建新节点
-		node := &ProcessNode{
-			Process:      process,
-			Dependencies: make([]string, len(process.DependsOn)),
-			Dependents:   []string{},
-		}
-		copy(node.Dependencies, process.DependsOn)
-
-		// 将节点添加到图中
-		g.nodes[serviceName] = node
-
-		// 递归处理所有依赖项
-		for _, depName := range process.DependsOn {
-			if err := addNode(depName); err != nil {
-				return fmt.Errorf("处理进程 '%s' 的依赖 '%s' 时失败: %w", serviceName, depName, err)
-			}
-		}
-
-		return nil
 	}
 
-	// 处理所有请求的服务
-	for _, serviceName := range services {
-		if err := addNode(serviceName); err != nil {
-			return err
+	// 使用递归函数来处理每个服务及其依赖
+	var addNodeAndGetPointer func(processName string) (*ProcessNode, error)
+	addNodeAndGetPointer = func(processName string) (*ProcessNode, error) {
+		// a. 如果节点已存在，直接返回它的指针，终止递归
+		if existingNode, exists := g.nodes[processName]; exists {
+			return existingNode, nil
+		}
+
+		// b. 检查进程是否在已启用的配置中定义
+		process, exists := enabledProcessesMap[processName]
+		if !exists {
+			return nil, fmt.Errorf("进程 '%s' 未在配置文件中定义或被禁用", processName)
+		}
+
+		// 创建新节点并立即加入到图中，以处理循环依赖
+		node := &ProcessNode{
+			Process:    process,
+			Dependents: []*ProcessNode{}, // 初始化为空切片
+		}
+		g.nodes[processName] = node
+
+		// 递归处理所有依赖项
+		dependencies := make([]*ProcessNode, 0, len(process.DependsOn))
+		for _, depName := range process.DependsOn {
+			// 递归调用
+			depNode, err := addNodeAndGetPointer(depName)
+			if err != nil {
+				// 包装错误，提供更清晰的上下文
+				return nil, fmt.Errorf("处理进程 '%s' 的依赖 '%s' 时失败: %w", processName, depName, err)
+			}
+			// 将返回的依赖节点指针添加到切片中
+			dependencies = append(dependencies, depNode)
+		}
+		// 将连接好的依赖关系设置回当前节点
+		node.Dependencies = dependencies
+
+		// e. 返回创建好的、连接完整的节点指针
+		return node, nil
+	}
+
+	// 3. 遍历所有请求启动的服务，开始递归构建
+	for _, process := range requestedProcesses {
+		if _, err := addNodeAndGetPointer(process.Name); err != nil {
 		}
 	}
 
@@ -123,79 +131,92 @@ func (g *DependencyGraph) buildNodes(allProcesses map[string]config.Process, ser
 // buildDependencyRelations 建立节点间的双向依赖关系
 // 为每个节点填充其依赖者列表，便于后续的层级计算
 func (g *DependencyGraph) buildDependencyRelations() error {
-	for nodeName, node := range g.nodes {
-		for _, depName := range node.Dependencies {
-			// 验证依赖的进程是否存在于图中
-			depNode, exists := g.nodes[depName]
-			if !exists {
-				return fmt.Errorf("进程 '%s' 的依赖 '%s' 不存在于依赖图中", nodeName, depName)
-			}
+	// 遍历图中的每一个节点 (我们称之为 nodeA)
+	for _, nodeA := range g.nodes {
+		// 遍历 nodeA 的所有依赖项 (我们称之为 nodeB)
+		for _, nodeB := range nodeA.Dependencies {
+			// 此时，我们已经确定了关系：nodeA 依赖 nodeB (nodeA -> nodeB)
 
-			// 将当前进程添加到其依赖进程的依赖者列表中
-			depNode.Dependents = append(depNode.Dependents, nodeName)
+			//  将 nodeA 的指针追加到 nodeB.Dependents
+			nodeB.Dependents = append(nodeB.Dependents, nodeA)
 		}
 	}
 
-	// 对依赖者列表进行排序，确保输出的确定性
+	// 使用 sort.Slice 对被依赖者列表进行排序
 	for _, node := range g.nodes {
-		sort.Strings(node.Dependents)
+		sort.Slice(node.Dependents, func(i, j int) bool {
+			// 根据被依赖者的进程名称进行字母序排序
+			return node.Dependents[i].Process.Name < node.Dependents[j].Process.Name
+		})
 	}
 
 	return nil
 }
 
-// detectCycles 使用深度优先搜索检测依赖图中的循环依赖
-// 采用经典的白灰黑三色标记算法
+// detectCycles 使用深度优先搜索检测依赖图中的循环依赖。
+// 采用经典的三色标记算法，并显式维护递归栈以准确报告循环路径。
 func (g *DependencyGraph) detectCycles() error {
-	// 节点状态定义：
-	// white (0): 未访问
-	// gray (1):  正在访问中（在当前DFS路径上）
-	// black (2): 已访问完成
+	// 节点状态定义:
 	const (
-		white = 0
-		gray  = 1
-		black = 2
+		white = 0 // white: 尚未访问
+		gray  = 1 // gray:  正在访问（位于当前递归栈上）
+		black = 2 // black: 已完成访问（及其所有后代）
 	)
 
-	nodeStates := make(map[string]int)
-	var cycleNodes []string
+	nodeStates := make(map[string]int, len(g.nodes))
+	// 初始化所有节点为“尚未访问”
+	for name := range g.nodes {
+		nodeStates[name] = white
+	}
 
-	// 深度优先搜索函数
-	var dfs func(nodeName string) error
-	dfs = func(nodeName string) error {
-		// 将当前节点标记为正在访问
+	// recursionStack 用于追踪当前的递归路径
+	var recursionStack []string
+
+	// 深度优先搜索的核心函数
+	var dfs func(node *ProcessNode) error
+	dfs = func(node *ProcessNode) error {
+		nodeName := node.Process.Name
+
+		// a. (标记) 将当前节点标记为“正在访问”，并推入递归栈
 		nodeStates[nodeName] = gray
+		recursionStack = append(recursionStack, nodeName)
 
-		node := g.nodes[nodeName]
-		for _, depName := range node.Dependencies {
+		// b. (探索) 遍历所有依赖项
+		for _, depNode := range node.Dependencies {
+			depName := depNode.Process.Name
+
 			switch nodeStates[depName] {
 			case gray:
-				// 发现回边，存在循环依赖
-				cycleNodes = append(cycleNodes, depName)
-				return fmt.Errorf("检测到循环依赖")
+				// c. (发现循环) 如果依赖项是灰色，说明我们找到了一个循环。
+				//    现在可以根据递归栈构建出准确的循环路径。
+				cyclePath := buildCyclePath(recursionStack, depName)
+				return fmt.Errorf("发现循环依赖链: %s", strings.Join(cyclePath, " -> "))
+
 			case white:
-				// 继续深度搜索未访问的节点
-				if err := dfs(depName); err != nil {
-					cycleNodes = append(cycleNodes, depName)
+				// d. (继续深搜) 如果依赖项是白色，对其进行递归访问。
+				if err := dfs(depNode); err != nil {
+					// 如果下层递归返回了错误，直接将错误向上传递。
 					return err
 				}
+			case black:
+				// e. 如果依赖项是黑色，说明它已经被安全地访问完毕，无需任何操作。
 			}
 		}
 
-		// 当前节点访问完成
+		// f. (完成访问) 当前节点的所有后代都已访问完毕，将其标记为“已完成”，并从递归栈中弹出。
+		//    使用 defer 可以确保即使在函数提前返回时也能正确执行。
+		//    (注意：在这个特定实现中，我们在 return 前手动弹出，defer 仅作为概念展示)
+		recursionStack = recursionStack[:len(recursionStack)-1]
 		nodeStates[nodeName] = black
 		return nil
 	}
 
-	// 对所有节点执行DFS检查
-	for nodeName := range g.nodes {
+	// 遍历图中所有节点，作为DFS的起点（以处理非连通图）
+	for nodeName, node := range g.nodes {
 		if nodeStates[nodeName] == white {
-			if err := dfs(nodeName); err != nil {
-				// 反转循环路径以显示正确的依赖顺序
-				for i, j := 0, len(cycleNodes)-1; i < j; i, j = i+1, j-1 {
-					cycleNodes[i], cycleNodes[j] = cycleNodes[j], cycleNodes[i]
-				}
-				return fmt.Errorf("发现循环依赖链: %s", strings.Join(cycleNodes, " -> "))
+			if err := dfs(node); err != nil {
+				// 旦发现循环，立即返回错误
+				return err
 			}
 		}
 	}
@@ -203,56 +224,87 @@ func (g *DependencyGraph) detectCycles() error {
 	return nil
 }
 
-// calculateLayers 计算分层执行计划
-// 使用修改的Kahn算法，将进程按依赖关系分层
-// 同层内的进程可以并行执行，层与层之间必须串行执行
+// buildCyclePath 是一个辅助函数，用于从递归栈中提取循环路径。
+func buildCyclePath(stack []string, cycleTarget string) []string {
+	var startIndex int
+	for i, name := range stack {
+		if name == cycleTarget {
+			startIndex = i
+			break
+		}
+	}
+	// 循环路径 = 栈中从循环点开始的部分 + 循环点自身（以闭合路径）
+	cycle := append(stack[startIndex:], cycleTarget)
+	return cycle
+}
+
+// calculateLayers 使用高效的 Kahn 算法（基于队列）计算分层执行计划。
 func (g *DependencyGraph) calculateLayers() error {
-	// 计算每个节点的入度（依赖数量）
-	inDegree := make(map[string]int)
-	for nodeName, node := range g.nodes {
-		inDegree[nodeName] = len(node.Dependencies)
+	// 1. 初始化：计算每个节点的初始入度（被依赖次数）
+	inDegree := make(map[string]int, len(g.nodes))
+	for name, node := range g.nodes {
+		inDegree[name] = len(node.Dependencies)
 	}
 
-	currentLayer := 0
+	// 2. 寻找起点：将所有入度为 0 的节点加入队列
+	// ✅ 核心修正 1: 使用队列代替循环扫描，提升效率
+	queue := list.New()
+	for name, degree := range inDegree {
+		if degree == 0 {
+			queue.PushBack(g.nodes[name]) // ✅ 核心修正 2: 队列中存储 *ProcessNode 指针
+		}
+	}
 
-	// 持续处理直到所有节点都被分层
-	for len(inDegree) > 0 {
-		// 查找当前层中入度为0的节点（无未满足依赖）
-		var currentLayerNodes []string
-		for nodeName, degree := range inDegree {
-			if degree == 0 {
-				currentLayerNodes = append(currentLayerNodes, nodeName)
-			}
+	var processedCount int
+	// 3. 迭代处理：当队列不为空时，持续处理
+	for queue.Len() > 0 {
+		currentLayerSize := queue.Len()
+		// ✅ 核心修正 3: 当前层的类型是 []*ProcessNode，而不是 []string
+		currentLayerNodes := make([]*ProcessNode, 0, currentLayerSize)
+
+		// 处理当前队列中的所有节点，它们构成了新的一层
+		for i := 0; i < currentLayerSize; i++ {
+			element := queue.Front()
+			queue.Remove(element)
+			node := element.Value.(*ProcessNode) // 从队列中取出节点
+
+			currentLayerNodes = append(currentLayerNodes, node)
 		}
 
-		// 如果没有入度为0的节点但还有未处理的节点，说明存在循环依赖
-		if len(currentLayerNodes) == 0 {
-			var remainingNodes []string
-			for nodeName := range inDegree {
-				remainingNodes = append(remainingNodes, nodeName)
-			}
-			return fmt.Errorf("无法完成分层，可能存在未检测到的循环依赖，剩余节点: %v", remainingNodes)
-		}
+		// 确保输出的确定性
+		sort.Slice(currentLayerNodes, func(i, j int) bool {
+			return currentLayerNodes[i].Process.Name < currentLayerNodes[j].Process.Name
+		})
 
-		// 对当前层的节点进行排序，确保输出的确定性
-		sort.Strings(currentLayerNodes)
+		// 为当前层的节点设置层级，并更新其下游节点的入度
+		for _, node := range currentLayerNodes {
+			node.Layer = len(g.layers) // 设置层级
+			processedCount++
 
-		// 为当前层的节点设置层级信息
-		for _, nodeName := range currentLayerNodes {
-			g.nodes[nodeName].Layer = currentLayer
-			delete(inDegree, nodeName)
-
-			// 更新依赖于当前节点的其他节点的入度
-			for _, dependent := range g.nodes[nodeName].Dependents {
-				if _, exists := inDegree[dependent]; exists {
-					inDegree[dependent]--
+			// 减少所有依赖于当前节点的“下游”节点的入度
+			for _, dependentNode := range node.Dependents {
+				dependentName := dependentNode.Process.Name
+				inDegree[dependentName]--
+				// 如果下游节点的入度变为 0，则将其加入队列，备战下一层
+				if inDegree[dependentName] == 0 {
+					queue.PushBack(dependentNode)
 				}
 			}
 		}
 
-		// 将当前层添加到分层计划中
 		g.layers = append(g.layers, currentLayerNodes)
-		currentLayer++
+	}
+
+	// 4. 验证：如果处理过的节点数少于总节点数，说明图中存在循环
+	if processedCount < len(g.nodes) {
+		var remainingNodes []string
+		for name, degree := range inDegree {
+			if degree > 0 { // 入度大于0的节点就是循环的一部分
+				remainingNodes = append(remainingNodes, name)
+			}
+		}
+		sort.Strings(remainingNodes)
+		return fmt.Errorf("无法完成分层，检测到循环依赖，涉及的进程有: %v", remainingNodes)
 	}
 
 	return nil
@@ -263,100 +315,18 @@ func (g *DependencyGraph) calculateLayers() error {
 //
 // 返回:
 //   - [][]config.Process: 分层执行计划，外层数组表示执行顺序，内层数组表示并行执行的进程
-//
-// 示例:
-//   layers := graph.GetExecutionLayers()
-//   for i, layer := range layers {
-//       fmt.Printf("第%d层 (并行执行): ", i+1)
-//       for _, process := range layer {
-//           fmt.Printf("%s ", process.Name)
-//       }
-//       fmt.Println()
-//   }
 func (g *DependencyGraph) GetExecutionLayers() [][]config.Process {
 	result := make([][]config.Process, len(g.layers))
-	
+
 	for i, layer := range g.layers {
 		result[i] = make([]config.Process, len(layer))
-		for j, nodeName := range layer {
-			result[i][j] = g.nodes[nodeName].Process
+		for j, node := range layer {
+			// ✅ 核心职责：提取 node 指针中的 Process 值
+			result[i][j] = node.Process
 		}
 	}
-	
+
 	return result
-}
-
-// GetExecutionPlan 获取线性执行计划（保持向后兼容性）
-// 将分层计划展平为线性顺序，用于需要串行执行的场景
-//
-// 返回:
-//   - []config.Process: 按依赖关系排序的进程配置列表
-func (g *DependencyGraph) GetExecutionPlan() []config.Process {
-	var result []config.Process
-	
-	for _, layer := range g.layers {
-		for _, nodeName := range layer {
-			result = append(result, g.nodes[nodeName].Process)
-		}
-	}
-	
-	return result
-}
-
-// GetNodeInfo 获取指定进程的节点信息
-// 用于调试和状态查询
-//
-// 参数:
-//   - processName: 进程名称
-//
-// 返回:
-//   - *ProcessNode: 进程节点信息，如果进程不存在则返回nil
-func (g *DependencyGraph) GetNodeInfo(processName string) *ProcessNode {
-	return g.nodes[processName]
-}
-
-// GetStats 获取依赖图统计信息
-// 返回依赖图的基本统计数据，用于调试和监控
-//
-// 返回:
-//   - map[string]any: 包含统计信息的映射表
-func (g *DependencyGraph) GetStats() map[string]any {
-	stats := map[string]any{
-		"total_processes": len(g.nodes),
-		"total_layers":    len(g.layers),
-		"layers_detail":   make([]map[string]any, len(g.layers)),
-	}
-
-	for i, layer := range g.layers {
-		stats["layers_detail"].([]map[string]any)[i] = map[string]any{
-			"layer_index":     i,
-			"processes_count": len(layer),
-			"processes":       layer,
-		}
-	}
-
-	return stats
-}
-
-// 兼容性函数：保持与现有代码的兼容性
-
-// GetExecutionPlan 全局函数，保持向后兼容性
-// 这是原有API的兼容版本，内部使用新的依赖图实现
-//
-// 参数:
-//   - allProcesses: 所有进程配置的映射表
-//   - requestedServices: 请求启动的进程名称列表
-//
-// 返回:
-//   - []config.Process: 按依赖关系排序的进程配置列表
-//   - error: 处理过程中的错误
-func GetExecutionPlan(allProcesses map[string]config.Process, requestedServices []string) ([]config.Process, error) {
-	graph, err := NewDependencyGraph(allProcesses, requestedServices)
-	if err != nil {
-		return nil, err
-	}
-	
-	return graph.GetExecutionPlan(), nil
 }
 
 // GetExecutionLayers 全局函数，提供新的分层执行计划功能
@@ -369,11 +339,11 @@ func GetExecutionPlan(allProcesses map[string]config.Process, requestedServices 
 // 返回:
 //   - [][]config.Process: 分层执行计划
 //   - error: 处理过程中的错误
-func GetExecutionLayers(allProcesses map[string]config.Process, requestedServices []string) ([][]config.Process, error) {
-	graph, err := NewDependencyGraph(allProcesses, requestedServices)
+func GetExecutionLayers(allProcesses []config.Process, requestedProcesses []config.Process) ([][]config.Process, error) {
+	graph, err := buildDependencyGraph(allProcesses, requestedProcesses)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return graph.GetExecutionLayers(), nil
 }

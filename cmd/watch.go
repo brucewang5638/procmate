@@ -20,7 +20,7 @@ var watchCmd = &cobra.Command{
 	Long: `这是一个长期运行的命令。它会周期性地检查所有已启用进程的状态，
 如果发现某个进程离线，则会自动尝试重新启动它。`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("✅ procmate 守护模式已启动... (按 Ctrl+C 退出)")
+		fmt.Println("✅ procmate 守护模式已启动... (sh下按 Ctrl+C 退出)")
 
 		watchInterval := config.Cfg.Settings.WatchIntervalSec
 
@@ -65,11 +65,7 @@ func checkAndRestartProcesses() {
 
 		// 检查是否运行正常
 		isRunning, _ := process.IsRunning(proc)
-		isReady, err := process.IsReady(proc)
-		if err != nil {
-			fmt.Printf("❌ 检查进程就绪状态失败: %v\033[0m\n", err)
-			continue
-		}
+		isReady, _ := process.IsReady(proc)
 
 		if isRunning {
 			if isReady {
@@ -108,69 +104,27 @@ func checkAndRestartProcesses() {
 	// 第三轮：并行重启需要重启的进程
 	if len(needRestartProcesses) > 0 {
 		fmt.Printf("\n⚡ 发现 %d 个离线进程，正在并行重启...\n", len(needRestartProcesses))
-		
-		// 构建进程映射表
-		allProcessesMap := make(map[string]config.Process)
+
+		var allEnabledProcesses []config.Process                  // 用于传递给函数
+		allEnabledProcessesMap := make(map[string]config.Process) // 用于快速查找和验证
 		for _, p := range config.Cfg.Processes {
-			allProcessesMap[p.Name] = p
+			if p.Enabled {
+				allEnabledProcesses = append(allEnabledProcesses, p)
+				allEnabledProcessesMap[p.Name] = p
+			}
 		}
-		
-		// 提取进程名称列表
-		var processNames []string
-		for _, proc := range needRestartProcesses {
-			processNames = append(processNames, proc.Name)
-		}
-		
-		// 获取分层执行计划
-		executionLayers, err := process.GetExecutionLayers(allProcessesMap, processNames)
+
+		manager := process.NewParallelStartManager(process.GetSmartParallelStartOptions())
+		ctx := context.Background()
+
+		executionLayers, err := process.GetExecutionLayers(allEnabledProcesses, needRestartProcesses)
 		if err != nil {
-			fmt.Printf("\033[31m❌ 无法确定重启计划: %v\033[0m\n", err)
-			return
+			fmt.Errorf("❌ 无法确定启动计划: %w")
 		}
 
-		if len(executionLayers) > 0 {
-			fmt.Printf("📋 重启计划：共 %d 层，将并行重启:\n", len(executionLayers))
-			for i, layer := range executionLayers {
-				fmt.Printf("　第 %d 层 (%d 个进程): ", i+1, len(layer))
-				for j, p := range layer {
-					if j > 0 {
-						fmt.Print(", ")
-					}
-					fmt.Print(p.Name)
-				}
-				fmt.Println()
-			}
-
-			// 使用智能失败处理的并行启动管理器执行重启
-			manager := process.NewParallelStartManager(process.GetSmartParallelStartOptions())
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-			defer cancel()
-			
-			layerResults, err := manager.StartProcessesInLayers(executionLayers, ctx)
-			if err != nil {
-				fmt.Printf("\033[31m❌ 并行重启失败: %v\033[0m\n", err)
-				return
-			}
-
-			// 显示重启结果汇总
-			totalSuccess := 0
-			totalFailure := 0
-			totalSkipped := 0
-			
-			for _, layerResult := range layerResults {
-				totalSuccess += layerResult.SuccessCount
-				totalFailure += layerResult.FailureCount
-				totalSkipped += layerResult.SkippedCount
-				
-				// 显示失败的进程详情
-				for _, result := range layerResult.Results {
-					if !result.Success && !result.IsSkipped {
-						fmt.Printf("\033[31m❌ 进程 %s 重启失败: %v\033[0m\n", result.Process.Name, result.Error)
-					}
-				}
-			}
-			
-			fmt.Printf("\033[32m📊 重启结果：成功 %d 个，失败 %d 个，跳过 %d 个\033[0m\n", totalSuccess, totalFailure, totalSkipped)
+		_, err = manager.StartProcessesInLayers(executionLayers, ctx)
+		if err != nil {
+			fmt.Errorf("❌ 并行启动失败: %w")
 		}
 	}
 }
@@ -198,7 +152,7 @@ func isProcessTimeoutNoReady(proc config.Process) bool {
 		fmt.Printf("\033[31m🚨 进程 '%s' 运行已超过 %d 秒但仍未就绪，标记为超时\033[0m\n", proc.Name, int(timeoutDuration.Seconds()))
 		return true
 	}
-	
+
 	return false
 }
 

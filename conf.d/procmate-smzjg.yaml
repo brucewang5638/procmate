@@ -1,4 +1,3 @@
-# 进程列表
 processes:
   # --- 原 Components 列表 ---
   - name: nginx
@@ -41,8 +40,8 @@ processes:
 
   - name: mariadb
     port: 3306
-    enabled: false
-    command: "systemctl start mariadb.service"
+    enabled: true
+    command: "/usr/libexec/mysqld --user=mysql --basedir=/usr --datadir=/var/lib/mysql"
     workdir: "/"
 
   # --- 原 Services 列表 ---
@@ -51,8 +50,11 @@ processes:
     enabled: true
     command: "java -Xmx1024m -jar /opt/hk/hkservice/framework/bus/bin/hkinfo-system.jar"
     workdir: "/opt/hk/hkservice/framework/bus/bin"
+    start_timeout_sec: 180
     log_files:
       - "/opt/hk/hkservice/framework/bus/logs/basic-error.log"
+      - "/opt/hk/hkservice/framework/bus/logs/basic-info.log"
+      - "/opt/hk/hkservice/framework/bus/logs/basic-db.log"
     depends_on:
       - mariadb
       - redis
@@ -60,14 +62,17 @@ processes:
       - zookeeper
       - kafka
       - nacos
-  
+
   - name: smzjg-assets
     port: 19715
     enabled: true
     command: "java -Xmx256m -jar /opt/hk/hkservice/assets/bus/bin/hkinfo-asset.jar"
     workdir: "/opt/hk/hkservice/assets/bus/bin"
+    start_timeout_sec: 180
     log_files:
       - "/opt/hk/hkservice/assets/bus/logs/asset-error.log"
+      - "/opt/hk/hkservice/assets/bus/logs/asset-info.log"
+      - "/opt/hk/hkservice/assets/bus/logs/asset-db.log"
     depends_on:
       - mariadb
       - redis
@@ -75,14 +80,17 @@ processes:
       - zookeeper
       - kafka
       - nacos
-  
+
   - name: smzjg-dispose
     port: 19712
     enabled: true
     command: "java -Xmx512m -jar /opt/hk/hkservice/dispose/bus/bin/hkinfo-dispose.jar"
     workdir: "/opt/hk/hkservice/dispose/bus/bin"
+    start_timeout_sec: 180
     log_files:
       - "/opt/hk/hkservice/dispose/bus/logs/error.log"
+      - "/opt/hk/hkservice/dispose/bus/logs/info.log"
+      - "/opt/hk/hkservice/dispose/bus/logs/db.log"
     depends_on:
       - mariadb
       - redis
@@ -90,14 +98,17 @@ processes:
       - zookeeper
       - kafka
       - nacos
-  
+
   - name: smzjg-icpconsole
     port: 19710
     enabled: true
     command: "java -Xmx512m -jar /opt/hk/hkservice/icp/bus/bin/icp-console.jar"
     workdir: "/opt/hk/hkservice/icp/bus/bin"
+    start_timeout_sec: 180
     log_files:
       - "/opt/hk/hkservice/icp/bus/logs/icp-error.log"
+      - "/opt/hk/hkservice/icp/bus/logs/icp-info.log"
+      - "/opt/hk/hkservice/icp/bus/logs/icp-db.log"
     depends_on:
       - mariadb
       - redis
@@ -105,14 +116,17 @@ processes:
       - zookeeper
       - kafka
       - nacos
-  
+
   - name: smzjg-milkyway-console
     port: 19705
     enabled: true
     command: "java -Xmx512m -jar /opt/hk/hkservice/milkyway/bus/console/bin/milkyway.jar"
     workdir: "/opt/hk/hkservice/milkyway/bus/console/bin"
+    start_timeout_sec: 180
     log_files:
       - "/opt/hk/hkservice/milkyway/bus/console/logs/milkyway-error.log"
+      - "/opt/hk/hkservice/milkyway/bus/console/logs/milkyway-info.log"
+      - "/opt/hk/hkservice/milkyway/bus/console/logs/milkyway-db.log"
     depends_on:
       - mariadb
       - redis
@@ -120,14 +134,17 @@ processes:
       - zookeeper
       - kafka
       - nacos
-  
+
   - name: smzjg-milkyway-service
     port: 19707
     enabled: true
     command: "java -Xmx512m -jar /opt/hk/hkservice/milkyway/bus/service/bin/datasource.jar"
     workdir: "/opt/hk/hkservice/milkyway/bus/service/bin"
+    start_timeout_sec: 180
     log_files:
       - "/opt/hk/hkservice/milkyway/bus/service/logs/error.log"
+      - "/opt/hk/hkservice/milkyway/bus/service/logs/info.log"
+      - "/opt/hk/hkservice/milkyway/bus/service/logs/db.log"
     depends_on:
       - mariadb
       - redis
@@ -135,14 +152,17 @@ processes:
       - zookeeper
       - kafka
       - nacos
-  
+
   - name: smzjg-report
     port: 19730
     enabled: true
     command: "java -Xmx512m -jar /opt/hk/hkservice/report/bus/bin/hkinfo-zjg-report.jar"
     workdir: "/opt/hk/hkservice/report/bus/bin"
+    start_timeout_sec: 180
     log_files:
       - "/opt/hk/hkservice/report/bus/logs/error.log"
+      - "/opt/hk/hkservice/report/bus/logs/info.log"
+      - "/opt/hk/hkservice/report/bus/logs/db.log"
     depends_on:
       - mariadb
       - redis
@@ -150,14 +170,17 @@ processes:
       - zookeeper
       - kafka
       - nacos
-  
+
   - name: smzjg-order
     port: 19723
     enabled: true
     command: "java -Xmx512m -jar /opt/hk/hkservice/order_tzb/bus/bin/hkinfo-order.jar"
     workdir: "/opt/hk/hkservice/order_tzb/bus/bin"
+    start_timeout_sec: 180
     log_files:
       - "/opt/hk/hkservice/order_tzb/bus/logs/error.log"
+      - "/opt/hk/hkservice/order_tzb/bus/logs/info.log"
+      - "/opt/hk/hkservice/order_tzb/bus/logs/db.log"
     depends_on:
       - mariadb
       - redis
@@ -165,14 +188,17 @@ processes:
       - zookeeper
       - kafka
       - nacos
-  
+
   - name: smzjg-smjcq-api
     port: 19762
     enabled: true
     command: "java -Xmx512m -jar /opt/hk/hkservice/smjcq/api/bus/bin/hkinfo-smjcq-api.jar"
     workdir: "/opt/hk/hkservice/smjcq/api/bus/bin"
+    start_timeout_sec: 180
     log_files:
       - "/opt/hk/hkservice/smjcq/api/bus/logs/smjcq-api-error.log"
+      - "/opt/hk/hkservice/smjcq/api/bus/logs/smjcq-api-info.log"
+      - "/opt/hk/hkservice/smjcq/api/bus/logs/smjcq-api-db.log"
     depends_on:
       - mariadb
       - redis
@@ -180,14 +206,17 @@ processes:
       - zookeeper
       - kafka
       - nacos
-  
+
   - name: smzjg-smjcq-manage
     port: 19760
     enabled: true
     command: "java -Xmx512m -jar /opt/hk/hkservice/smjcq/manage/bus/bin/hkinfo-smjcq-manage.jar"
     workdir: "/opt/hk/hkservice/smjcq/manage/bus/bin"
+    start_timeout_sec: 180
     log_files:
       - "/opt/hk/hkservice/smjcq/manage/bus/logs/smjcq-manage-error.log"
+      - "/opt/hk/hkservice/smjcq/manage/bus/logs/smjcq-manage-info.log"
+      - "/opt/hk/hkservice/smjcq/manage/bus/logs/smjcq-manage-db.log"
     depends_on:
       - mariadb
       - redis
@@ -195,14 +224,17 @@ processes:
       - zookeeper
       - kafka
       - nacos
-  
+
   - name: smzjg-screen
     port: 19713
     enabled: true
     command: "java -Xmx512m -jar /opt/hk/hkservice/screen/bus/bin/screen.jar"
     workdir: "/opt/hk/hkservice/screen/bus/bin"
+    start_timeout_sec: 180
     log_files:
       - "/opt/hk/hkservice/screen/bus/logs/error.log"
+      - "/opt/hk/hkservice/screen/bus/logs/info.log"
+      - "/opt/hk/hkservice/screen/bus/logs/db.log"
     depends_on:
       - mariadb
       - redis

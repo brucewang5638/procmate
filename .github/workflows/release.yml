@@ -42,8 +42,8 @@ jobs:
         with:
           # 指定 GoReleaser 的版本
           version: latest
-          # 给予它执行权限的参数
-          args: release --clean
+          # 给予它执行权限的参数，如果标签包含 - 则添加 --prerelease 标志
+          args: release --clean ${{ contains(github.ref_name, '-') && '--prerelease' || '' }}
         env:
           # GITHUB_TOKEN 是一个由 GitHub Actions 自动生成的秘密令牌，
           # GoReleaser 需要用它来获得向您的仓库创建 Release 的权限。

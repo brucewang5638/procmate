@@ -100,6 +100,12 @@ func waitForReady(proc config.Process) error {
 
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
+		// 首先检查进程是否还在运行
+		running, _ := IsRunning(proc)
+		if !running {
+			return fmt.Errorf("进程 '%s' 在启动期间已停止运行", proc.Name)
+		}
+		
 		ready, _ := IsReady(proc)
 		if ready {
 			return nil // 成功！
